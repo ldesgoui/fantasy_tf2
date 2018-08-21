@@ -7,12 +7,7 @@ This is currently a rush. Things will get better whenever I have the time.
 
 ## TODO:
 
-
 A view of a fantasy_team's current score, this is the trickiest bit, you have to join and match contract timings (holy shit dude a join)
-
-
-Some checks in create_transaction
-
 
 Then some security:
 
