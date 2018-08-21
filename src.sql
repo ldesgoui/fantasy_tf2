@@ -220,6 +220,7 @@ begin;
         select p.*
              , count(1) as matches_played
              , sum(m.total_score) as total_score
+             , sum(m.total_score) / count(1) as efficiency
           from player p
      left join match_performance m on (m.tournament, m.player) = (p.tournament, p.steam_id)
       group by (p.tournament, p.steam_id);
@@ -227,6 +228,7 @@ begin;
     create view player_standing as
         select *
              , rank() over (order by total_score desc)
+             , rank() over (order by efficiency desc) as efficiency_rank
           from player_total_score;
 
     create table manager
