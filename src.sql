@@ -57,7 +57,6 @@ begin;
         ( match                 int references match
         , tournament            text not null references tournament
         , player                text not null
-        , total_score           int not null
         , game_win              bool not null
         , round_win             int not null
         , frag                  int not null
@@ -75,33 +74,23 @@ begin;
         , foreign key (tournament, player) references player
         );
 
-    create function performance_sum()
-        returns trigger
-        language plpgsql
-        as $$
-        begin
-            new.total_score :=
-                  new.game_win::int * 3
-                + new.round_win * 3
-                + new.frag
-                + new.medic_frag
-                + new.frag_as_medic * 2
-                + new.dpm / 25
-                + new.ubercharge * 2
-                + new.ubercharge_dropped * -3
-                + new.team_medic_death / -5
-                + new.top_frag::int * 2
-                + new.top_damage::int * 2
-                + new.top_kdr::int * 2
-                + new.airshot / 5
-                + new.capture;
-            return new;
-        end;
-    $$;
-
-    create trigger performance_sum
-        before insert or update on match_performance
-        for each row execute procedure performance_sum();
+        create view match_performance_score as
+            select *
+                 , game_win::int * 3
+                 + round_win * 3
+                 + frag
+                 + medic_frag
+                 + frag_as_medic * 2
+                 + dpm / 25
+                 + ubercharge * 2
+                 + ubercharge_dropped * -3
+                 + team_medic_death / -5
+                 + top_frag::int * 2
+                 + top_damage::int * 2
+                 + top_kdr::int * 2
+                 + airshot / 5
+                 + capture as total_score
+              from match_performance;
 
     create function import_logs(tournament text, id int, data jsonb)
         returns bool
@@ -184,7 +173,6 @@ begin;
                     ( id
                     , tournament
                     , player_id
-                    , 0
                     , case when is_player_blue
                         then blue_score > red_score
                         else red_score > blue_score
@@ -222,13 +210,13 @@ begin;
              , sum(m.total_score) as total_score
              , sum(m.total_score) / count(1) as efficiency
           from player p
-     left join match_performance m on (m.tournament, m.player) = (p.tournament, p.steam_id)
+     left join match_performance_score m on (m.tournament, m.player) = (p.tournament, p.steam_id)
       group by (p.tournament, p.steam_id);
 
     create view player_standing as
         select *
-             , rank() over (order by total_score desc)
-             , rank() over (order by efficiency desc) as efficiency_rank
+             , dense_rank() over (order by total_score desc) as rank
+             , dense_rank() over (order by efficiency desc) as efficiency_rank
           from player_total_score;
 
     create table manager
@@ -270,6 +258,32 @@ begin;
            from contract c
       left join player p on (c.tournament, c.player) = (p.tournament, p.steam_id)
           where upper(time) is null;
+
+    create view contract_value as
+        select c.*
+             , sum(p.total_score) as total_score
+             , sum(p.total_score) / count(1) as efficiency
+          from contract c
+     left join match_performance_score p on (c.tournament, c.player) = (p.tournament, p.player)
+     left join match m on p.match = m.id
+         where c.time @> m.time
+      group by (c.tournament, c.manager, c.player, c.time);
+
+    create view team_score as
+        select tournament
+             , manager
+             , sum(total_score) as total_score
+          from (
+            select tournament
+                  , manager
+                  , total_score from contract_value
+          union all
+             select tournament
+                  , manager
+                  , 0 as total_score
+               from fantasy_team
+          ) f
+      group by (tournament, manager);
 
     create view team_cost as
          select tournament
@@ -500,12 +514,19 @@ begin;
     insert into manager values
         ( '0'
         , 'twiikuu'
+        ),
+        ( '1'
+        , 'fjksjkf'
         );
 
     insert into fantasy_team values
         ( 'i63'
         , '0'
         , 'WARHURYEAH IS FOREVER'
+        ),
+        ( 'i63'
+        , '1'
+        , 'gah'
         );
 
     select create_transaction('i63', ARRAY[
