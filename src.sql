@@ -133,19 +133,19 @@ begin;
 
             select key
               from jsonb_each(data->'players')
-          order by value->'kills'
+          order by value->'kills' desc
              limit 1
               into top_fragger;
 
             select key
               from jsonb_each(data->'players')
-          order by value->'dmg'
+          order by value->'dmg' desc
              limit 1
               into top_damager;
 
             select key
               from jsonb_each(data->'players')
-          order by value->'kpd'
+          order by value->'kpd' desc
              limit 1
               into top_kdr;
 
@@ -153,6 +153,7 @@ begin;
               from jsonb_each(data->'classkills')
              where data->'players'->key->>'team' = 'Red'
               into blue_team_medic_death;
+
             select sum((value->>'medic')::int)
               from jsonb_each(data->'classkills')
              where data->'players'->key->>'team' = 'Blue'
