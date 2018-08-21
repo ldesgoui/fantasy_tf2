@@ -6,10 +6,10 @@ drop role admin;
 
 begin;
 
+    create extension if not exists btree_gist;
+
     create schema fantasy_tf2;
     set search_path to fantasy_tf2;
-
-    create extension if not exists btree_gist;
 
     create type class as enum
         ( 'scout'
@@ -401,7 +401,7 @@ begin;
             end;
     $$;
 
-    create role authenticator nologin noinherit;
+    create role authenticator noinherit;
     create role anonymous nologin;
     create role manager nologin;
     create role admin nologin bypassrls;
