@@ -16,8 +16,6 @@ A view of a fantasy_team's current score, this is the trickiest bit, you have to
 
 Some checks in create_transaction
 
-Some logic to calc the number of medic deaths per team
-
 
 Then some security:
 

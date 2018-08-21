@@ -80,22 +80,21 @@ begin;
         language plpgsql
         as $$
         begin
-            raise notice 'help';
             new.total_score :=
-                  (new.game_win::int * 3)
-                + (new.round_win * 3)
-                + (new.frag)
-                + (new.medic_frag)
-                + (new.frag_as_medic * 2)
-                + (new.dpm / 25)
-                + (new.ubercharge * 2)
-                + (new.ubercharge_dropped * -3)
-                + (new.team_medic_death / -5)
-                + (new.top_frag::int * 2)
-                + (new.top_damage::int * 2)
-                + (new.top_kdr::int * 2)
-                + (new.airshot / 5)
-                + (new.capture);
+                  new.game_win::int * 3
+                + new.round_win * 3
+                + new.frag
+                + new.medic_frag
+                + new.frag_as_medic * 2
+                + new.dpm / 25
+                + new.ubercharge * 2
+                + new.ubercharge_dropped * -3
+                + new.team_medic_death / -5
+                + new.top_frag::int * 2
+                + new.top_damage::int * 2
+                + new.top_kdr::int * 2
+                + new.airshot / 5
+                + new.capture;
             return new;
         end;
     $$;
@@ -150,9 +149,14 @@ begin;
              limit 1
               into top_kdr;
 
-            -- TODO
-            blue_team_medic_death := 0;
-            red_team_medic_death := 0;
+            select sum((value->>'medic')::int)
+              from jsonb_each(data->'classkills')
+             where data->'players'->key->>'team' = 'Red'
+              into blue_team_medic_death;
+            select sum((value->>'medic')::int)
+              from jsonb_each(data->'classkills')
+             where data->'players'->key->>'team' = 'Blue'
+              into red_team_medic_death;
 
             for player_id in select * from jsonb_object_keys(data->'players') loop
 
@@ -210,6 +214,19 @@ begin;
             return 't';
         end;
     $$;
+
+    create view player_total_score as
+        select p.*
+             , count(1) as matches_played
+             , sum(m.total_score) as total_score
+          from player p
+     left join match_performance m on (m.tournament, m.player) = (p.tournament, p.steam_id)
+      group by (p.tournament, p.steam_id);
+
+    create view player_standing as
+        select *
+             , rank() over (order by total_score desc)
+          from player_total_score;
 
     create table manager
         ( steam_id              text primary key
