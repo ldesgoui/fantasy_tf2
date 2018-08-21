@@ -117,6 +117,9 @@ begin;
                 )
             on conflict do nothing;
 
+            delete from match_performance
+             where match = id;
+
             blue_score := data->'teams'->'Blue'->'score';
             red_score := data->'teams'->'Red'->'score';
 
@@ -337,7 +340,7 @@ begin;
                 end if;
 
                 update contract
-                   set time = tsrange(lower(time), now()::timestamp + interval '1 hour')
+                   set time = tsrange(lower(time), now()::timestamp)
                  where tournament = tnm
                    and manager = mgr
                    and upper(time) is null
@@ -537,14 +540,14 @@ begin;
         '[U:1:81145222]',
         '[U:1:204729823]'
         ]);
-    select create_transaction('i63', ARRAY[
-        '[U:1:172044269]',
-        '[U:1:172534925]',
-        '[U:1:178869439]',
-        '[U:1:247875068]',
-        '[U:1:59977210]',
-        '[U:1:95820688]'
-    ]);
+    --select create_transaction('i63', ARRAY[
+    --    '[U:1:172044269]',
+    --    '[U:1:172534925]',
+    --    '[U:1:178869439]',
+    --    '[U:1:247875068]',
+    --    '[U:1:59977210]',
+    --    '[U:1:95820688]'
+    --]);
 
 
 
