@@ -1,5 +1,33 @@
 -- functions.sql
 
+create function time_joined(contract)
+    returns timestamp
+    language sql
+    as $$
+        select lower($1.time);
+$$;
+
+create function time_left(contract)
+    returns timestamp
+    language sql
+    as $$
+        select upper($1.time);
+$$;
+
+create function time_joined(contract_value)
+    returns timestamp
+    language sql
+    as $$
+        select lower($1.time);
+$$;
+
+create function time_left(contract_value)
+    returns timestamp
+    language sql
+    as $$
+        select upper($1.time);
+$$;
+
 create function create_transaction(tnm text, new_roster text[])
     returns bool
     language plpgsql
@@ -15,10 +43,6 @@ create function create_transaction(tnm text, new_roster text[])
                      where steam_id = mgr
                 ) then
                 raise exception 'Manager does not exist';
-            end if;
-
-            if array_length(new_roster, 1) <> 6 then
-                raise exception 'New roster must be 6 players';
             end if;
 
             update contract

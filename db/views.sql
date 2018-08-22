@@ -48,6 +48,7 @@ create view active_contract as
 
 create view contract_value as
     select c.*
+         , count(1) as matches_played
          , sum(p.total_score) as total_score
          , sum(p.total_score) / count(1) as efficiency
       from contract c
@@ -61,7 +62,7 @@ create view team_score as
          , manager
          , sum(total_score) as total_score
       from (
-        select tournament
+         select tournament
               , manager
               , total_score from contract_value
       union all
@@ -71,6 +72,11 @@ create view team_score as
            from fantasy_team
       ) f
   group by (tournament, manager);
+
+create view team_standing as
+    select *
+         , dense_rank() over (order by total_score desc) as rank
+      from team_score;
 
 create view team_cost as
      select tournament
