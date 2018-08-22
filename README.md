@@ -1,8 +1,10 @@
 # Fantasy TF2
 
 
-This is currently a rush. Things will get better whenever I have the time.
+    psql -f db/uninstall.sql -f db/install.sql -f db/test_data.sql
 
+
+This is currently a rush. Things will get better whenever I have the time.
 
 
 ## TODO:

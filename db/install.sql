@@ -7,10 +7,10 @@ begin;
     create schema fantasy_tf2;
     set search_path to fantasy_tf2;
 
-    \i types.sql
-    \i tables.sql
-    \i views.sql
-    \i functions.sql
-    \i security.sql
+    \ir types.sql
+    \ir tables.sql
+    \ir views.sql
+    \ir functions.sql
+    \ir security.sql
 
 commit;
