@@ -74,9 +74,13 @@ create view team_score as
   group by (tournament, manager);
 
 create view team_standing as
-    select *
-         , dense_rank() over (order by total_score desc) as rank
-      from team_score;
+    select t.*
+         , m.name as manager_name
+         , s.total_score
+         , dense_rank() over (order by s.total_score desc) as rank
+      from team_score s
+ left join manager m on (m.steam_id = s.manager)
+ left join fantasy_team t on (s.tournament, s.manager) = (t.tournament, t.manager);
 
 create view team_cost as
      select tournament

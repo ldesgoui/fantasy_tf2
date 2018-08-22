@@ -16,6 +16,24 @@ begin;
         , 'Se7en'
         ),
         ( 'i63'
+        , 'FAINT Gaming'
+        ),
+        ( 'i63'
+        , 'Ascent.EU'
+        ),
+        ( 'i63'
+        , 'SVIFT'
+        ),
+        ( 'i63'
+        , 'The Bus Crew'
+        ),
+        ( 'i63'
+        , 'Ora Elektro'
+        ),
+        ( 'i63'
+        , 'Timed Out'
+        ),
+        ( 'i63'
         , 'froyotech'
         );
 
@@ -30,42 +48,42 @@ begin;
         ( 'i63'
         , '[U:1:118758944]'
         , 'Thalash'
-        , 'Se7en'
+        , 'Timed Out'
         , 'scout'
         , '1000'
         ),
         ( 'i63'
         , '[U:1:167517704]'
         , 'Thaigrr'
-        , 'Se7en'
+        , 'Ora Elektro'
         , 'scout'
         , '1000'
         ),
         ( 'i63'
         , '[U:1:172044269]'
         , 'Adysky'
-        , 'Se7en'
+        , 'The Bus Crew'
         , 'soldier'
         , '1000'
         ),
         ( 'i63'
         , '[U:1:172534925]'
         , 'stark'
-        , 'Se7en'
+        , 'SVIFT'
         , 'medic'
         , '1000'
         ),
         ( 'i63'
         , '[U:1:178869439]'
         , 'AMS'
-        , 'Se7en'
+        , 'Ascent.EU'
         , 'soldier'
         , '1000'
         ),
         ( 'i63'
         , '[U:1:204729823]'
         , 'shade'
-        , 'froyotech'
+        , 'FAINT Gaming'
         , 'medic'
         , '1000'
         ),
