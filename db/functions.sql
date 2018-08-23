@@ -1,5 +1,15 @@
 -- functions.sql
 
+create function my_team_standing()
+    returns team_standing
+    immutable
+    language sql
+    as $$
+    select *
+    from team_standing
+    where manager = current_setting('request.jwt.claim.manager_id', true);
+$$;
+
 create function time_joined(contract)
     returns timestamp
     language sql

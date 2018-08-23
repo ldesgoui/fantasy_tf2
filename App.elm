@@ -16,8 +16,10 @@ import Material.Options as Options
 import Material.Textfield as Textfield
 import Material.Theme as Theme
 import Material.Typography as Typography
+import Navigation
+import Regex
 import Set exposing (Set)
-import Time exposing (Time)
+import String
 
 
 -- MAIN
@@ -25,7 +27,7 @@ import Time exposing (Time)
 
 main : Program Never Model Msg
 main =
-    Html.program
+    Navigation.program (.hash >> UrlChange)
         { init = init
         , subscriptions = subscriptions
         , update = update
@@ -48,17 +50,7 @@ type alias Model =
 
 defaultModel : Model
 defaultModel =
-    { page =
-        MyFantasyTeamPage
-            (MyFantasyTeamPageModel
-                { managerName = "twiikuu"
-                , managerSteamId = "0"
-                , name = "WARHURYEAH IS FOREVER"
-                , rank = 1
-                , totalScore = 69.9
-                }
-                Set.empty
-            )
+    { page = LoadingPage
     , errors = []
     , session = Just "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoibWFuYWdlciIsIm1hbmFnZXJfaWQiOiIwIn0.XKRhX2lRU15o0IYlJwraXK2u6dyuXJBpu44XMp4G1ZA"
     , players = []
@@ -124,19 +116,19 @@ type alias ActiveContract =
     }
 
 
-init : ( Model, Cmd Msg )
-init =
+init : Navigation.Location -> ( Model, Cmd Msg )
+init loc =
     let
         _ =
             Debug.log "hey" "If you're a bit of a tech head and feel like snooping, the API (powered by https://postgrest.com) is available at https://fantasy.tf2.gg/api/, you should be able to use https://petstore.swagger.io on that URL to get the auto-generated docs. The code is available at https://github.com/ldesgoui/fantasy_tf2"
+
+        ( newModel, cmds ) =
+            changePage loc.hash defaultModel
     in
-    defaultModel
+    newModel
         ! [ Material.init Mdc
           , fetchPlayers
-
-          -- , fetchHomePage
-          , fetchRoster
-                "0"
+          , cmds
           ]
 
 
@@ -146,31 +138,31 @@ init =
 
 type Msg
     = NoOp
+    | UrlChange String
     | CloseErrors
     | RecvPlayers (Result Http.Error (List Player))
     | RecvHomePage (Result Http.Error (List FantasyTeam))
     | RecvRoster (Result Http.Error (List ActiveContract))
+    | RecvFantasyTeamPage (Result Http.Error FantasyTeam)
+    | RecvMyFantasyTeamPage (Result Http.Error FantasyTeam)
     | ToggleSelect String
     | ChangeFantasyTeamName String
     | SubmitTeam
-    | UpdateErrors (Result Http.Error (Maybe (List String)))
+    | UpdateErrors (Result Http.Error ())
     | Mdc (Material.Msg Msg)
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
-    case msg of
+    case msg |> Debug.log "update" of
         Mdc mdcMsg ->
             Material.update Mdc mdcMsg model
 
-        UpdateErrors (Ok Nothing) ->
-            model ! []
+        UrlChange hash ->
+            changePage hash model
 
-        UpdateErrors (Ok (Just errs)) ->
-            { model
-                | errors = model.errors ++ errs
-            }
-                ! []
+        UpdateErrors (Ok ()) ->
+            model ! []
 
         UpdateErrors (Err Http.Timeout) ->
             { model
@@ -297,6 +289,54 @@ update msg model =
             }
                 ! []
 
+        RecvFantasyTeamPage (Ok team) ->
+            { model
+                | page = FantasyTeamPage (FantasyTeamPageModel team [])
+            }
+                ! [ fetchRoster team.managerSteamId ]
+
+        RecvFantasyTeamPage (Err Http.Timeout) ->
+            { model
+                | page = ErrorPage "Connection to server timed out"
+            }
+                ! []
+
+        RecvFantasyTeamPage (Err Http.NetworkError) ->
+            { model
+                | page = ErrorPage "Couldn't establish connection to server"
+            }
+                ! []
+
+        RecvFantasyTeamPage (Err _) ->
+            { model
+                | page = ErrorPage "Couldn't load fantasy team page, please contact developer on the Essentials.TF Discord or at twiikuu@gmail.com"
+            }
+                ! []
+
+        RecvMyFantasyTeamPage (Ok team) ->
+            { model
+                | page = MyFantasyTeamPage (MyFantasyTeamPageModel team Set.empty)
+            }
+                ! [ fetchRoster team.managerSteamId ]
+
+        RecvMyFantasyTeamPage (Err Http.Timeout) ->
+            { model
+                | page = ErrorPage "Connection to server timed out"
+            }
+                ! []
+
+        RecvMyFantasyTeamPage (Err Http.NetworkError) ->
+            { model
+                | page = ErrorPage "Couldn't establish connection to server"
+            }
+                ! []
+
+        RecvMyFantasyTeamPage (Err _) ->
+            { model
+                | page = ErrorPage "Couldn't load manager page, please contact developer on the Essentials.TF Discord or at twiikuu@gmail.com"
+            }
+                ! []
+
         RecvRoster (Ok roster) ->
             { model
                 | page =
@@ -338,6 +378,41 @@ update msg model =
             model ! []
 
 
+changePage : String -> Model -> ( Model, Cmd Msg )
+changePage hash model =
+    case hashToRoute hash of
+        Just HomeRoute ->
+            { model
+                | page = LoadingPage
+            }
+                ! [ fetchHomePage ]
+
+        Just (FantasyTeamRoute id) ->
+            { model
+                | page = LoadingPage
+            }
+                ! [ fetchFantasyTeamRoute id
+                  ]
+
+        Just MyFantasyTeamRoute ->
+            { model
+                | page = LoadingPage
+            }
+                ! (case model.session of
+                    Just session ->
+                        [ fetchMyFantasyTeamRoute session ]
+
+                    Nothing ->
+                        []
+                  )
+
+        _ ->
+            { model
+                | page = ErrorPage "URL not found"
+            }
+                ! []
+
+
 subscriptions : Model -> Sub Msg
 subscriptions model =
     Material.subscriptions Mdc model
@@ -372,8 +447,37 @@ fetchRoster managerId =
         |> Http.send RecvRoster
 
 
+fetchFantasyTeamRoute : String -> Cmd Msg
+fetchFantasyTeamRoute id =
+    Http.request
+        { method = "GET"
+        , headers =
+            [ Http.header "Accept" "application/vnd.pgrst.object+json"
+            ]
+        , url = api ++ "/team_standing?limit=1&manager=eq." ++ id
+        , body = Http.emptyBody
+        , expect = Http.expectJson decodeFantasyTeam
+        , timeout = Nothing
+        , withCredentials = False
+        }
+        |> Http.send RecvFantasyTeamPage
 
--- TODO: ERROR CHECKING HERE
+
+fetchMyFantasyTeamRoute : String -> Cmd Msg
+fetchMyFantasyTeamRoute session =
+    Http.request
+        { method = "GET"
+        , headers =
+            [ Http.header "Authorization" ("Bearer " ++ session)
+            , Http.header "Accept" "application/vnd.pgrst.object+json"
+            ]
+        , url = api ++ "/rpc/my_team_standing"
+        , body = Http.emptyBody
+        , expect = Http.expectJson decodeFantasyTeam
+        , timeout = Nothing
+        , withCredentials = False
+        }
+        |> Http.send RecvMyFantasyTeamPage
 
 
 updateName : String -> String -> String -> Cmd Msg
@@ -390,7 +494,7 @@ updateName session id name =
                     [ "name" |> to (Json.Encode.string name)
                     ]
                 )
-        , expect = Http.expectStringResponse (\f -> Ok Nothing)
+        , expect = Http.expectStringResponse (\_ -> Ok ())
         , timeout = Nothing
         , withCredentials = False
         }
@@ -418,7 +522,7 @@ updateRoster session roster =
                             )
                     ]
                 )
-        , expect = Http.expectStringResponse (\f -> Ok Nothing)
+        , expect = Http.expectStringResponse (\_ -> Ok ())
         , timeout = Nothing
         , withCredentials = False
         }
@@ -488,7 +592,7 @@ viewHeader model =
                         Options.attribute (Html.href "#TODO")
 
                     Just _ ->
-                        oRoute MyFantasyTeamRoute
+                        Button.link (routeToHash MyFantasyTeamRoute)
                 ]
                 [ case model.session of
                     Nothing ->
@@ -619,6 +723,7 @@ viewHomePage model pageModel =
         ]
 
 
+viewHomePagePlayer : Player -> Html Msg
 viewHomePagePlayer player =
     Lists.li []
         [ Lists.graphic
@@ -661,6 +766,7 @@ viewHomePagePlayer player =
         ]
 
 
+viewHomePageTeam : FantasyTeam -> Html Msg
 viewHomePageTeam team =
     Lists.li []
         [ Lists.text []
@@ -756,6 +862,7 @@ viewFantasyTeamPage model pageModel =
         ]
 
 
+viewFantasyTeamPagePlayer : ActiveContract -> Html Msg
 viewFantasyTeamPagePlayer player =
     Lists.li []
         [ Lists.graphic
@@ -796,7 +903,7 @@ viewFantasyTeamPagePlayer player =
                     [ Options.css "text-align" "right"
                     , Theme.textPrimaryOnBackground
                     ]
-                    [ text (toString player.price) ]
+                    [ text (toString player.totalScore) ]
                 , Lists.secondaryText
                     [ Options.css "text-align" "right"
                     ]
@@ -826,6 +933,9 @@ viewMyFantasyTeamPage model pageModel =
                         )
                     ]
                     [ text pageModel.team.managerName ]
+                ]
+            , Html.p []
+                [ text "Please note that transfers (selling a player) are limited 6 and more are unlocked during the tournament. I haven't had the time to show counters on this page, so... good luck."
                 ]
             , Html.p []
                 [ text "Apologies for the raw/unfinished UI, I'm having to rush things to make it in time. You might have to give it trial and error, not all the logic is programmed on the UI but it's definitely present in the server, so if you make mistakes, they won't be saved"
@@ -926,6 +1036,7 @@ viewMyFantasyTeamPage model pageModel =
         ]
 
 
+viewMyFantasyTeamPagePlayer : Set String -> Player -> Html Msg
 viewMyFantasyTeamPagePlayer selectedPlayers player =
     Lists.li
         [ Lists.selected
@@ -972,7 +1083,6 @@ viewMyFantasyTeamPagePlayer selectedPlayers player =
 
 
 -- ROUTE
--- TODO
 
 
 type Route
@@ -981,14 +1091,46 @@ type Route
     | MyFantasyTeamRoute
 
 
-route : Route -> Html.Attribute Msg
+hashToRoute : String -> Maybe Route
+hashToRoute hash =
+    case hash of
+        "" ->
+            Just HomeRoute
+
+        "#" ->
+            Just HomeRoute
+
+        "#manage" ->
+            Just MyFantasyTeamRoute
+
+        _ ->
+            if Regex.contains (Regex.regex "^#\\d*$") hash then
+                Just (FantasyTeamRoute (String.dropLeft 1 hash))
+            else
+                Nothing
+
+
+routeToHash : Route -> String
+routeToHash r =
+    case r of
+        HomeRoute ->
+            "#"
+
+        FantasyTeamRoute id ->
+            "#" ++ id
+
+        MyFantasyTeamRoute ->
+            "#manage"
+
+
+route : Route -> Html.Attribute a
 route r =
-    Html.href "#TODO"
+    Html.href (routeToHash r)
 
 
-oRoute : Route -> Options.Property c Msg
+oRoute : Route -> Options.Property a b
 oRoute r =
-    Options.attribute (Html.href "#TODO")
+    Options.attribute (route r)
 
 
 
