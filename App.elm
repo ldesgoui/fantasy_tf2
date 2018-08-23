@@ -176,6 +176,26 @@ update msg model =
             }
                 ! []
 
+        UpdateErrors (Err (Http.BadStatus dat)) ->
+            let
+                message =
+                    Json.Decode.decodeString
+                        (Json.Decode.field "message" Json.Decode.string)
+                        dat.body
+            in
+            { model
+                | errors =
+                    model.errors
+                        ++ (case message of
+                                Ok message ->
+                                    [ message ]
+
+                                Err _ ->
+                                    []
+                           )
+            }
+                ! []
+
         UpdateErrors (Err _) ->
             { model
                 | page = ErrorPage "Couldn't save your changes, please RELOAD or contact developer on the Essentials.TF Discord or at twiikuu@gmail.com"
@@ -768,14 +788,9 @@ viewHomePagePlayer player =
 
 viewHomePageTeam : FantasyTeam -> Html Msg
 viewHomePageTeam team =
-    Lists.li []
+    Lists.a [ oRoute (FantasyTeamRoute team.managerSteamId) ]
         [ Lists.text []
-            [ Options.styled Html.a
-                [ oRoute (FantasyTeamRoute team.managerSteamId)
-                , Options.css "text-decoration" "none"
-                , Theme.textPrimaryOnBackground
-                ]
-                [ text team.name ]
+            [ text team.name
             , Lists.secondaryText []
                 [ Options.styled Html.a
                     [ Options.attribute
@@ -935,7 +950,7 @@ viewMyFantasyTeamPage model pageModel =
                     [ text pageModel.team.managerName ]
                 ]
             , Html.p []
-                [ text "Please note that transfers (selling a player) are limited 6 and more are unlocked during the tournament. I haven't had the time to show counters on this page, so... good luck."
+                [ text "Please note that transactions (selling a player) are limited to 4 and more are unlocked during the tournament. I haven't had the time to show counters on this page, so... good luck. If you bug me about it, I'll fix this."
                 ]
             , Html.p []
                 [ text "Apologies for the raw/unfinished UI, I'm having to rush things to make it in time. You might have to give it trial and error, not all the logic is programmed on the UI but it's definitely present in the server, so if you make mistakes, they won't be saved"
