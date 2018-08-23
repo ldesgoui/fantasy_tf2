@@ -7310,3 +7310,20 @@ a.mdc-list-item {
   text-transform: uppercase; }
 
 /*# sourceMappingURL=material-components-web.css.map*/
+
+
+
+@media (max-width: 839px) {
+    .fantasy-team--description {
+        padding-left: 72px;
+        padding-right: 16px;
+    }
+}
+
+a {
+    color: var(--mdc-theme-primary);
+}
+
+[for="my-fantasy-team-name"] {
+    color: rgba(0, 0, 0, 0.6) !important;
+}

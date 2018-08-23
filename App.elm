@@ -5,6 +5,7 @@ import Html.Attributes as Html
 import Http
 import Json.Decode
 import Json.Decode.Pipeline
+import Json.Encode
 import Material
 import Material.Button as Button
 import Material.Elevation as Elevation
@@ -12,6 +13,7 @@ import Material.LayoutGrid as LayoutGrid
 import Material.LinearProgress as LinearProgress
 import Material.List as Lists
 import Material.Options as Options
+import Material.Textfield as Textfield
 import Material.Theme as Theme
 import Material.Typography as Typography
 import Set exposing (Set)
@@ -46,23 +48,19 @@ type alias Model =
 
 defaultModel : Model
 defaultModel =
-    { page = LoadingPage
-
-    --FantasyTeamPage
-    --    (FantasyTeamPageModel
-    --        { managerName = "twiikuu"
-    --        , managerSteamId = "0"
-    --        , name = "WARHURYEAH IS FOREVER"
-    --        , rank = 1
-    --        , totalScore = 69.9
-    --        }
-    --        []
-    --    )
-    , errors =
-        [ "What's up, twiikuu here."
-        , "This this an early version because I started this project like 4 days before I had to travel for LAN, some UI stuff might be janky but the backend is steady as a rock. If you run into issues, feel free to hit me up on twitter @twiikuu, on Discord twiikuu#0047 (or in the Essentials.tf server) or by email at twiikuu@gmail.com"
-        ]
-    , session = Nothing
+    { page =
+        MyFantasyTeamPage
+            (MyFantasyTeamPageModel
+                { managerName = "twiikuu"
+                , managerSteamId = "0"
+                , name = "WARHURYEAH IS FOREVER"
+                , rank = 1
+                , totalScore = 69.9
+                }
+                Set.empty
+            )
+    , errors = []
+    , session = Just "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoibWFuYWdlciIsIm1hbmFnZXJfaWQiOiIwIn0.XKRhX2lRU15o0IYlJwraXK2u6dyuXJBpu44XMp4G1ZA"
     , players = []
     , mdc = Material.defaultModel
     }
@@ -88,8 +86,8 @@ type alias FantasyTeamPageModel =
 
 
 type alias MyFantasyTeamPageModel =
-    { fantasyTeam : FantasyTeam
-    , selectedRoster : Set String
+    { team : FantasyTeam
+    , roster : Set String
     }
 
 
@@ -123,8 +121,6 @@ type alias ActiveContract =
     , mainClass : String
     , price : Int
     , totalScore : Float
-    , timeJoined : Time
-    , timeLeft : Time
     }
 
 
@@ -132,12 +128,15 @@ init : ( Model, Cmd Msg )
 init =
     let
         _ =
-            Debug.log "hey" "If you're a bit of a tech head and feel like snooping, the API (powered by https://postgrest.com) is available at https://fantasy.tf2.gg/api, you should be able to use https://petstore.swagger.io on that URL to get the auto-generated docs. The code is available at https://github.com/ldesgoui/fantasy_tf2"
+            Debug.log "hey" "If you're a bit of a tech head and feel like snooping, the API (powered by https://postgrest.com) is available at https://fantasy.tf2.gg/api/, you should be able to use https://petstore.swagger.io on that URL to get the auto-generated docs. The code is available at https://github.com/ldesgoui/fantasy_tf2"
     in
     defaultModel
         ! [ Material.init Mdc
           , fetchPlayers
-          , fetchHomePage
+
+          -- , fetchHomePage
+          , fetchRoster
+                "0"
           ]
 
 
@@ -150,14 +149,99 @@ type Msg
     | CloseErrors
     | RecvPlayers (Result Http.Error (List Player))
     | RecvHomePage (Result Http.Error (List FantasyTeam))
+    | RecvRoster (Result Http.Error (List ActiveContract))
+    | ToggleSelect String
+    | ChangeFantasyTeamName String
+    | SubmitTeam
+    | UpdateErrors (Result Http.Error (Maybe (List String)))
     | Mdc (Material.Msg Msg)
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
-    case msg |> Debug.log "update" of
+    case msg of
         Mdc mdcMsg ->
             Material.update Mdc mdcMsg model
+
+        UpdateErrors (Ok Nothing) ->
+            model ! []
+
+        UpdateErrors (Ok (Just errs)) ->
+            { model
+                | errors = model.errors ++ errs
+            }
+                ! []
+
+        UpdateErrors (Err Http.Timeout) ->
+            { model
+                | page = ErrorPage "Connection to server timed out"
+            }
+                ! []
+
+        UpdateErrors (Err Http.NetworkError) ->
+            { model
+                | page = ErrorPage "Couldn't establish connection to server"
+            }
+                ! []
+
+        UpdateErrors (Err _) ->
+            { model
+                | page = ErrorPage "Couldn't save your changes, please RELOAD or contact developer on the Essentials.TF Discord or at twiikuu@gmail.com"
+            }
+                ! []
+
+        SubmitTeam ->
+            model
+                ! (case ( model.session, model.page ) of
+                    ( Just session, MyFantasyTeamPage pageModel ) ->
+                        [ updateName session pageModel.team.managerSteamId pageModel.team.name
+                        , updateRoster session pageModel.roster
+                        ]
+
+                    _ ->
+                        []
+                  )
+
+        ChangeFantasyTeamName newName ->
+            { model
+                | page =
+                    case model.page of
+                        MyFantasyTeamPage pageModel ->
+                            let
+                                oldTeam =
+                                    pageModel.team
+                            in
+                            MyFantasyTeamPage
+                                { pageModel
+                                    | team =
+                                        { oldTeam
+                                            | name = newName
+                                        }
+                                }
+
+                        _ ->
+                            model.page
+            }
+                ! []
+
+        ToggleSelect id ->
+            { model
+                | page =
+                    case model.page of
+                        MyFantasyTeamPage pageModel ->
+                            MyFantasyTeamPage
+                                { pageModel
+                                    | roster =
+                                        if Set.member id pageModel.roster then
+                                            Set.remove id pageModel.roster
+                                        else
+                                            Set.insert id pageModel.roster
+                                }
+
+                        _ ->
+                            model.page
+            }
+                ! []
 
         CloseErrors ->
             { model
@@ -213,6 +297,43 @@ update msg model =
             }
                 ! []
 
+        RecvRoster (Ok roster) ->
+            { model
+                | page =
+                    case model.page of
+                        FantasyTeamPage pageModel ->
+                            FantasyTeamPage { pageModel | roster = roster }
+
+                        MyFantasyTeamPage pageModel ->
+                            MyFantasyTeamPage
+                                { pageModel
+                                    | roster =
+                                        roster |> List.map .steamId |> Set.fromList
+                                }
+
+                        _ ->
+                            model.page
+            }
+                ! []
+
+        RecvRoster (Err Http.Timeout) ->
+            { model
+                | page = ErrorPage "Connection to server timed out"
+            }
+                ! []
+
+        RecvRoster (Err Http.NetworkError) ->
+            { model
+                | page = ErrorPage "Couldn't establish connection to server"
+            }
+                ! []
+
+        RecvRoster (Err _) ->
+            { model
+                | page = ErrorPage "Couldn't load roster, please contact developer on the Essentials.TF Discord or at twiikuu@gmail.com"
+            }
+                ! []
+
         NoOp ->
             model ! []
 
@@ -243,17 +364,77 @@ fetchHomePage =
         |> Http.send RecvHomePage
 
 
+fetchRoster : String -> Cmd Msg
+fetchRoster managerId =
+    Http.get
+        (api ++ "/active_contract_value?order=main_class&manager=eq." ++ managerId)
+        (Json.Decode.list decodeActiveContract)
+        |> Http.send RecvRoster
+
+
+
+-- TODO: ERROR CHECKING HERE
+
+
+updateName : String -> String -> String -> Cmd Msg
+updateName session id name =
+    Http.request
+        { method = "PATCH"
+        , headers =
+            [ Http.header "Authorization" ("Bearer " ++ session)
+            ]
+        , url = api ++ "/fantasy_team?manager=eq." ++ id
+        , body =
+            Http.jsonBody
+                (Json.Encode.object
+                    [ "name" |> to (Json.Encode.string name)
+                    ]
+                )
+        , expect = Http.expectStringResponse (\f -> Ok Nothing)
+        , timeout = Nothing
+        , withCredentials = False
+        }
+        |> Http.send UpdateErrors
+
+
+updateRoster : String -> Set String -> Cmd Msg
+updateRoster session roster =
+    Http.request
+        { method = "POST"
+        , headers =
+            [ Http.header "Authorization" ("Bearer " ++ session)
+            ]
+        , url = api ++ "/rpc/create_transaction"
+        , body =
+            Http.jsonBody
+                (Json.Encode.object
+                    [ "tnm" |> to (Json.Encode.string "i63")
+                    , "new_roster"
+                        |> to
+                            (roster
+                                |> Set.toList
+                                |> List.map Json.Encode.string
+                                |> Json.Encode.list
+                            )
+                    ]
+                )
+        , expect = Http.expectStringResponse (\f -> Ok Nothing)
+        , timeout = Nothing
+        , withCredentials = False
+        }
+        |> Http.send UpdateErrors
+
+
 
 -- VIEW
 
 
 view : Model -> Html Msg
 view model =
-    Html.div
-        [ Html.style
-            [ "display" |> to "flex"
-            , "flex-flow" |> to "column"
-            ]
+    Options.styled Html.div
+        [ Options.css "display" "flex"
+        , Options.css "flex-flow" "column"
+        , Options.attribute (Html.attribute "style" "--mdc-theme-primary: rgb(212, 99, 38)")
         ]
         [ viewHeader model
         , viewErrors model
@@ -287,36 +468,46 @@ viewHeader model =
                 ]
                 []
             ]
-        , Button.view Mdc
-            "login-manage"
-            model.mdc
-            [ Button.ripple
-            , Button.dense
-            , Options.attribute (Html.attribute "style" "--mdc-theme-primary: #6c9c2f")
-            , case model.session of
-                Nothing ->
-                    Options.attribute (Html.href "#TODO")
+        , Html.div
+            [ Html.style
+                [ "display" |> to "flex"
+                , "flex-flow" |> to "row"
+                , "align-items" |> to "center"
+                , "justify-content" |> to "center"
+                ]
+            ]
+            [ Button.view Mdc
+                "login-manage"
+                model.mdc
+                [ Button.ripple
+                , Button.dense
+                , Options.attribute (Html.attribute "style" "--mdc-theme-primary: #6c9c2f")
+                , Options.css "margin" "4px"
+                , case model.session of
+                    Nothing ->
+                        Options.attribute (Html.href "#TODO")
 
-                Just _ ->
-                    oRoute MyFantasyTeamRoute
-            ]
-            [ case model.session of
-                Nothing ->
-                    text "Sign in through STEAM"
+                    Just _ ->
+                        oRoute MyFantasyTeamRoute
+                ]
+                [ case model.session of
+                    Nothing ->
+                        text "Sign in through STEAM"
 
-                Just _ ->
-                    text "Manage my team"
-            ]
-        , Button.view Mdc
-            "lan-tf-link"
-            model.mdc
-            [ Button.ripple
-            , Button.dense
-            , Button.link "https://lan.tf"
-            , Options.attribute (Html.attribute "style" "--mdc-theme-primary: rgb(212, 99, 38)")
-            , Options.attribute (Html.href "https://lan.tf")
-            ]
-            [ text "lan.tf"
+                    Just _ ->
+                        text "Manage my team"
+                ]
+            , Button.view Mdc
+                "lan-tf-link"
+                model.mdc
+                [ Button.ripple
+                , Button.dense
+                , Button.link "https://lan.tf"
+                , Options.attribute (Html.target "_blank")
+                , Options.css "margin" "4px"
+                ]
+                [ text "lan.tf"
+                ]
             ]
         ]
 
@@ -384,9 +575,11 @@ viewPage model =
 viewHomePage : Model -> HomePageModel -> Html Msg
 viewHomePage model pageModel =
     LayoutGrid.view
-        []
+        [ Elevation.z4
+        ]
         [ LayoutGrid.cell
             [ LayoutGrid.span6
+            , LayoutGrid.span8Tablet
             ]
             [ Options.styled Html.h3
                 [ Typography.headline6
@@ -397,7 +590,7 @@ viewHomePage model pageModel =
                 [ text "Best Fantasy Teams" ]
             , Lists.ul
                 [ Lists.twoLine
-                , Options.css "min-width" "320px"
+                , Options.css "min-width" "280px"
                 ]
                 (pageModel.teams
                     |> List.map viewHomePageTeam
@@ -405,6 +598,7 @@ viewHomePage model pageModel =
             ]
         , LayoutGrid.cell
             [ LayoutGrid.span6
+            , LayoutGrid.span8Tablet
             ]
             [ Options.styled Html.h3
                 [ Typography.headline6
@@ -416,7 +610,7 @@ viewHomePage model pageModel =
             , Lists.ul
                 [ Lists.twoLine
                 , Lists.avatarList
-                , Options.css "min-width" "320px"
+                , Options.css "min-width" "280px"
                 ]
                 (model.players
                     |> List.map viewHomePagePlayer
@@ -503,45 +697,277 @@ viewHomePageTeam team =
         ]
 
 
-teamColor : String -> String
-teamColor team =
-    case team of
-        "Se7en" ->
-            "#4494ca"
-
-        "froyotech" ->
-            "#94ca42"
-
-        "SVIFT" ->
-            "black"
-
-        "Ora Elektro" ->
-            "hsl(0, 100%, 40%)"
-
-        "The Bus Crew" ->
-            "#e0c200"
-
-        "Ascent.EU" ->
-            "#00aef0"
-
-        "FAINT Gaming" ->
-            "#6f08a1"
-
-        "Timed Out" ->
-            "pink"
-
-        _ ->
-            "0"
-
-
 viewFantasyTeamPage : Model -> FantasyTeamPageModel -> Html Msg
 viewFantasyTeamPage model pageModel =
-    text ""
+    LayoutGrid.view
+        [ Elevation.z1
+        ]
+        [ LayoutGrid.cell
+            [ LayoutGrid.span6
+            , LayoutGrid.span8Tablet
+            , Options.cs "fantasy-team--description"
+            ]
+            [ Options.styled Html.h3
+                [ Typography.headline5
+                , Typography.adjustMargin
+                ]
+                [ text pageModel.team.name ]
+            , Options.styled Html.a
+                [ Typography.headline6
+                , Typography.adjustMargin
+                , Theme.textSecondaryOnBackground
+                , Options.attribute
+                    (Html.href
+                        ("https://steamcommunity.com/profiles/"
+                            ++ pageModel.team.managerSteamId
+                        )
+                    )
+                , Options.attribute (Html.target "_blank")
+                ]
+                [ text "managed by "
+                , text pageModel.team.managerName
+                ]
+            , Options.styled Html.p
+                [ Typography.body1
+                ]
+                [ text "total score: "
+                , text (toString pageModel.team.totalScore)
+                ]
+            , Options.styled Html.p
+                [ Typography.body1
+                ]
+                [ text "rank #"
+                , text (toString pageModel.team.rank)
+                ]
+            ]
+        , LayoutGrid.cell
+            [ LayoutGrid.span6
+            , LayoutGrid.span8Tablet
+            ]
+            [ Lists.ul
+                [ Lists.twoLine
+                , Lists.avatarList
+                , Options.css "min-width" "280px"
+                ]
+                (pageModel.roster
+                    |> List.map viewFantasyTeamPagePlayer
+                )
+            ]
+        ]
+
+
+viewFantasyTeamPagePlayer player =
+    Lists.li []
+        [ Lists.graphic
+            [ Options.css "background-color" (teamColor player.team)
+            ]
+            [ Html.img
+                [ Html.src
+                    ("class/" ++ player.mainClass ++ ".png")
+                , Html.style
+                    [ "max-width" |> to "75%"
+                    , "max-height" |> to "75%"
+                    ]
+                ]
+                []
+            ]
+        , Lists.text []
+            [ Options.styled Html.a
+                [ Options.attribute
+                    (Html.href
+                        ("https://steamcommunity.com/profiles/"
+                            ++ player.steamId
+                        )
+                    )
+                , Options.attribute (Html.target "_blank")
+                , Options.css "text-decoration" "none"
+                , Theme.textPrimaryOnBackground
+                ]
+                [ text player.name
+                ]
+            , Lists.secondaryText []
+                [ text player.team
+                ]
+            ]
+        , Lists.meta
+            []
+            [ Lists.text []
+                [ Options.styled Html.div
+                    [ Options.css "text-align" "right"
+                    , Theme.textPrimaryOnBackground
+                    ]
+                    [ text (toString player.price) ]
+                , Lists.secondaryText
+                    [ Options.css "text-align" "right"
+                    ]
+                    [ text "$"
+                    , text (toString player.price)
+                    ]
+                ]
+            ]
+        ]
 
 
 viewMyFantasyTeamPage : Model -> MyFantasyTeamPageModel -> Html Msg
 viewMyFantasyTeamPage model pageModel =
-    text ""
+    LayoutGrid.view
+        [ Elevation.z1
+        ]
+        [ LayoutGrid.cell
+            [ LayoutGrid.span12
+            , Typography.body1
+            ]
+            [ Html.p []
+                [ text "Hello, "
+                , Html.a
+                    [ Html.href
+                        ("https://steamcommunity.com/profiles/"
+                            ++ pageModel.team.managerSteamId
+                        )
+                    ]
+                    [ text pageModel.team.managerName ]
+                ]
+            , Html.p []
+                [ text "Apologies for the raw/unfinished UI, I'm having to rush things to make it in time. You might have to give it trial and error, not all the logic is programmed on the UI but it's definitely present in the server, so if you make mistakes, they won't be saved"
+                ]
+            , Html.p []
+                [ text "Your total score is "
+                , text (toString pageModel.team.totalScore)
+                , text ", your rank is #"
+                , text (toString pageModel.team.rank)
+                ]
+            , Html.p []
+                [ text "Your budget is $130000, your selected roster is worth $"
+                , text
+                    (toString
+                        (List.foldr
+                            (\a b ->
+                                if Set.member a.steamId pageModel.roster then
+                                    a.price + b
+                                else
+                                    b
+                            )
+                            0
+                            model.players
+                        )
+                    )
+                ]
+            , Html.p []
+                [ text "Thanks for playing, I hope you enjoy yourself participating and watching i63"
+                ]
+            ]
+        , LayoutGrid.cell
+            [ LayoutGrid.span12
+            , Options.css "display" "flex"
+            , Options.css "flex-flow" "row"
+            , Options.css "align-items" "baseline"
+            , Options.css "justify-content" "center"
+            ]
+            [ Textfield.view Mdc
+                "my-fantasy-team-name"
+                model.mdc
+                [ Textfield.label "My Fantasy Team Name"
+                , Textfield.value pageModel.team.name
+                , Options.onInput ChangeFantasyTeamName
+                , Options.css "margin" "0 12px"
+                ]
+                []
+            , Button.view Mdc
+                "submit-my-fantasy-team"
+                model.mdc
+                [ Button.ripple
+                , Options.onClick SubmitTeam
+                , Options.css "margin" "0 12px"
+                ]
+                [ text "Submit changes"
+                ]
+            ]
+        , LayoutGrid.cell
+            [ LayoutGrid.span4
+            ]
+            [ Lists.ul
+                [ Lists.twoLine
+                , Lists.avatarList
+                , Options.css "min-width" "280px"
+                ]
+                (model.players
+                    |> List.filter (\p -> p.mainClass == "scout")
+                    |> List.map (viewMyFantasyTeamPagePlayer pageModel.roster)
+                )
+            ]
+        , LayoutGrid.cell
+            [ LayoutGrid.span4
+            ]
+            [ Lists.ul
+                [ Lists.twoLine
+                , Lists.avatarList
+                , Options.css "min-width" "280px"
+                ]
+                (model.players
+                    |> List.filter (\p -> p.mainClass == "soldier")
+                    |> List.map (viewMyFantasyTeamPagePlayer pageModel.roster)
+                )
+            ]
+        , LayoutGrid.cell
+            [ LayoutGrid.span4
+            , LayoutGrid.span8Tablet
+            ]
+            [ Lists.ul
+                [ Lists.twoLine
+                , Lists.avatarList
+                , Options.css "min-width" "280px"
+                ]
+                (model.players
+                    |> List.filter (\p -> p.mainClass == "demoman" || p.mainClass == "medic")
+                    |> List.sortBy .mainClass
+                    |> List.map (viewMyFantasyTeamPagePlayer pageModel.roster)
+                )
+            ]
+        ]
+
+
+viewMyFantasyTeamPagePlayer selectedPlayers player =
+    Lists.li
+        [ Lists.selected
+            |> Options.when (Set.member player.steamId selectedPlayers)
+        , Options.onClick (ToggleSelect player.steamId)
+        ]
+        [ Lists.graphic
+            [ Options.css "background-color" (teamColor player.team)
+            ]
+            [ Html.img
+                [ Html.src
+                    ("class/" ++ player.mainClass ++ ".png")
+                , Html.style
+                    [ "max-width" |> to "75%"
+                    , "max-height" |> to "75%"
+                    ]
+                ]
+                []
+            ]
+        , Lists.text []
+            [ text player.name
+            , Lists.secondaryText []
+                [ text player.team
+                ]
+            ]
+        , Lists.meta
+            []
+            [ Lists.text []
+                [ Options.styled Html.div
+                    [ Options.css "text-align" "right"
+                    , Theme.textPrimaryOnBackground
+                    ]
+                    [ text (toString player.totalScore) ]
+                , Lists.secondaryText
+                    [ Options.css "text-align" "right"
+                    ]
+                    [ text "$"
+                    , text (toString player.price)
+                    ]
+                ]
+            ]
+        ]
 
 
 
@@ -574,6 +1000,37 @@ to a b =
     ( b, a )
 
 
+teamColor : String -> String
+teamColor team =
+    case team of
+        "Se7en" ->
+            "#4494ca"
+
+        "froyotech" ->
+            "#94ca42"
+
+        "SVIFT" ->
+            "black"
+
+        "Ora Elektro" ->
+            "hsl(0, 100%, 40%)"
+
+        "The Bus Crew" ->
+            "#e0c200"
+
+        "Ascent.EU" ->
+            "#00aef0"
+
+        "FAINT Gaming" ->
+            "#6f08a1"
+
+        "Timed Out" ->
+            "pink"
+
+        _ ->
+            "0"
+
+
 
 -- JSON
 
@@ -601,3 +1058,14 @@ decodeFantasyTeam =
         |> Json.Decode.Pipeline.required "manager" Json.Decode.string
         |> Json.Decode.Pipeline.required "total_score" Json.Decode.float
         |> Json.Decode.Pipeline.required "rank" Json.Decode.int
+
+
+decodeActiveContract : Json.Decode.Decoder ActiveContract
+decodeActiveContract =
+    Json.Decode.Pipeline.decode ActiveContract
+        |> Json.Decode.Pipeline.required "steam_id" Json.Decode.string
+        |> Json.Decode.Pipeline.required "name" Json.Decode.string
+        |> Json.Decode.Pipeline.required "team" Json.Decode.string
+        |> Json.Decode.Pipeline.required "main_class" Json.Decode.string
+        |> Json.Decode.Pipeline.required "price" Json.Decode.int
+        |> Json.Decode.Pipeline.required "total_score" Json.Decode.float

@@ -57,6 +57,14 @@ create view contract_value as
      where c.time @> m.time
   group by (c.tournament, c.manager, c.player, c.time);
 
+create view active_contract_value as
+    select c.*
+         , coalesce(v.matches_played, 0) as matches_played
+         , coalesce(v.total_score, 0) as total_score
+         , coalesce(v.efficiency, 0) as efficiency
+      from active_contract c
+   natural left outer join contract_value v;
+
 create view team_score as
     select tournament
          , manager
