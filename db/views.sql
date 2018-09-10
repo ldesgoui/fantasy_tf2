@@ -63,7 +63,7 @@ create view active_contract_value as
          , coalesce(v.total_score, 0) as total_score
          , coalesce(v.efficiency, 0) as efficiency
       from active_contract c
-   natural left outer join contract_value v;
+      left join contract_value v on (c.tournament, c.manager, c.player, c.time) = (v.tournament, v.manager, v.player, v.time);
 
 create view team_score as
     select tournament

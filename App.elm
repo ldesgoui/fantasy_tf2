@@ -1,5 +1,6 @@
 module App exposing (main)
 
+import Jwt
 import Html exposing (Html, text)
 import Html.Attributes as Html
 import Http
@@ -25,9 +26,9 @@ import String
 -- MAIN
 
 
-main : Program Never Model Msg
+main : Program Flags Model Msg
 main =
-    Navigation.program (.hash >> UrlChange)
+    Navigation.programWithFlags (.hash >> UrlChange)
         { init = init
         , subscriptions = subscriptions
         , update = update
@@ -52,7 +53,7 @@ defaultModel : Model
 defaultModel =
     { page = LoadingPage
     , errors = []
-    , session = Just "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoibWFuYWdlciIsIm1hbmFnZXJfaWQiOiIwIn0.XKRhX2lRU15o0IYlJwraXK2u6dyuXJBpu44XMp4G1ZA"
+    , session = Nothing
     , players = []
     , mdc = Material.defaultModel
     }
@@ -116,8 +117,10 @@ type alias ActiveContract =
     }
 
 
-init : Navigation.Location -> ( Model, Cmd Msg )
-init loc =
+type alias Flags = { session : Maybe String }
+
+init : Flags -> Navigation.Location -> ( Model, Cmd Msg )
+init flags loc =
     let
         _ =
             Debug.log "hey" "If you're a bit of a tech head and feel like snooping, the API (powered by https://postgrest.com) is available at https://fantasy.tf2.gg/api/, you should be able to use https://petstore.swagger.io on that URL to get the auto-generated docs. The code is available at https://github.com/ldesgoui/fantasy_tf2"
@@ -125,7 +128,9 @@ init loc =
         ( newModel, cmds ) =
             changePage loc.hash defaultModel
     in
-    newModel
+    { newModel
+        | session = flags.session
+    }
         ! [ Material.init Mdc
           , fetchPlayers
           , cmds
@@ -138,6 +143,7 @@ init loc =
 
 type Msg
     = NoOp
+    | Logout
     | UrlChange String
     | CloseErrors
     | RecvPlayers (Result Http.Error (List Player))
@@ -157,6 +163,11 @@ update msg model =
     case msg |> Debug.log "update" of
         Mdc mdcMsg ->
             Material.update Mdc mdcMsg model
+
+        Logout ->
+            { model
+                | session = Nothing
+            } ! []
 
         UrlChange hash ->
             changePage hash model
@@ -227,7 +238,7 @@ update msg model =
                                 { pageModel
                                     | team =
                                         { oldTeam
-                                            | name = newName
+                                            | name = String.left 64 newName
                                         }
                                 }
 
@@ -440,13 +451,13 @@ subscriptions model =
 
 api : String
 api =
-    "http://10.233.1.2/api"
+    "/api"
 
 
 fetchPlayers : Cmd Msg
 fetchPlayers =
     Http.get
-        (api ++ "/player_standing")
+        (api ++ "/player_standing?order=efficiency.desc.nullslast")
         (Json.Decode.list decodePlayer)
         |> Http.send RecvPlayers
 
@@ -454,7 +465,7 @@ fetchPlayers =
 fetchHomePage : Cmd Msg
 fetchHomePage =
     Http.get
-        (api ++ "/team_standing?limit=48")
+        (api ++ "/team_standing?order=total_score.desc.nullslast&limit=100")
         (Json.Decode.list decodeFantasyTeam)
         |> Http.send RecvHomePage
 
@@ -485,19 +496,23 @@ fetchFantasyTeamRoute id =
 
 fetchMyFantasyTeamRoute : String -> Cmd Msg
 fetchMyFantasyTeamRoute session =
-    Http.request
-        { method = "GET"
-        , headers =
-            [ Http.header "Authorization" ("Bearer " ++ session)
-            , Http.header "Accept" "application/vnd.pgrst.object+json"
-            ]
-        , url = api ++ "/rpc/my_team_standing"
-        , body = Http.emptyBody
-        , expect = Http.expectJson decodeFantasyTeam
-        , timeout = Nothing
-        , withCredentials = False
-        }
-        |> Http.send RecvMyFantasyTeamPage
+    case Jwt.decodeToken (Json.Decode.field "manager_id" Json.Decode.string) session |> Debug.log "manager" of
+        Ok managerId ->
+            Http.request
+                { method = "GET"
+                , headers =
+                    [ Http.header "Accept" "application/vnd.pgrst.object+json"
+                    ]
+                , url = api ++ "/team_standing?limit=1&manager=eq." ++ managerId
+                , body = Http.emptyBody
+                , expect = Http.expectJson decodeFantasyTeam
+                , timeout = Nothing
+                , withCredentials = False
+                }
+                |> Http.send RecvMyFantasyTeamPage
+
+        Err _ ->
+            Cmd.none
 
 
 updateName : String -> String -> String -> Cmd Msg
@@ -537,8 +552,10 @@ updateRoster session roster =
                         |> to
                             (roster
                                 |> Set.toList
-                                |> List.map Json.Encode.string
-                                |> Json.Encode.list
+                                |> String.join ","
+                                |> String.append "{"
+                                |> flip String.append "}"
+                                |> Json.Encode.string
                             )
                     ]
                 )
@@ -606,10 +623,11 @@ viewHeader model =
                 [ Button.ripple
                 , Button.dense
                 , Options.attribute (Html.attribute "style" "--mdc-theme-primary: #6c9c2f")
+                    |> Options.when (Nothing == model.session)
                 , Options.css "margin" "4px"
                 , case model.session of
                     Nothing ->
-                        Options.attribute (Html.href "#TODO")
+                        Button.link "/auth/redirect"
 
                     Just _ ->
                         Button.link (routeToHash MyFantasyTeamRoute)
@@ -621,6 +639,19 @@ viewHeader model =
                     Just _ ->
                         text "Manage my team"
                 ]
+            , case model.session of
+                Nothing -> text ""
+                Just _ ->
+                Button.view Mdc
+                    "logout"
+                    model.mdc
+                    [ Button.ripple
+                    , Button.dense
+                    , Options.attribute (Html.attribute "onClick" "localStorage.clear()")
+                    , Options.onClick Logout
+                    , Options.css "margin" "4px"
+                    ]
+                    [ text "Logout" ]
             , Button.view Mdc
                 "lan-tf-link"
                 model.mdc
@@ -779,8 +810,8 @@ viewHomePagePlayer player =
             ]
         , Lists.meta
             []
-            [ text (toString player.totalScore)
-            , text " #"
+            [ text (toString (toFloat (floor (player.efficiency * 100)) / 100))
+            , text " avg #"
             , text (toString player.rank)
             ]
         ]
@@ -918,7 +949,8 @@ viewFantasyTeamPagePlayer player =
                     [ Options.css "text-align" "right"
                     , Theme.textPrimaryOnBackground
                     ]
-                    [ text (toString player.totalScore) ]
+                    [ text (toString player.totalScore)
+                    ]
                 , Lists.secondaryText
                     [ Options.css "text-align" "right"
                     ]
@@ -950,7 +982,7 @@ viewMyFantasyTeamPage model pageModel =
                     [ text pageModel.team.managerName ]
                 ]
             , Html.p []
-                [ text "Please note that transactions (selling a player) are limited to 4 and more are unlocked during the tournament. I haven't had the time to show counters on this page, so... good luck. If you bug me about it, I'll fix this."
+                [ text "Please note that transactions (selling a player) are limited to 10. I haven't had the time to show counters on this page, so... good luck. If you bug me about it, I'll fix this."
                 ]
             , Html.p []
                 [ text "Apologies for the raw/unfinished UI, I'm having to rush things to make it in time. You might have to give it trial and error, not all the logic is programmed on the UI but it's definitely present in the server, so if you make mistakes, they won't be saved"
@@ -962,7 +994,7 @@ viewMyFantasyTeamPage model pageModel =
                 , text (toString pageModel.team.rank)
                 ]
             , Html.p []
-                [ text "Your budget is $130000, your selected roster is worth $"
+                [ text "Your budget is $140000, your selected roster is worth $"
                 , text
                     (toString
                         (List.foldr
@@ -1084,7 +1116,8 @@ viewMyFantasyTeamPagePlayer selectedPlayers player =
                     [ Options.css "text-align" "right"
                     , Theme.textPrimaryOnBackground
                     ]
-                    [ text (toString player.totalScore) ]
+                    [ text (toString (toFloat (floor (player.efficiency * 100)) / 100))
+                    , text " avg"]
                 , Lists.secondaryText
                     [ Options.css "text-align" "right"
                     ]
@@ -1200,10 +1233,18 @@ decodePlayer =
         |> Json.Decode.Pipeline.required "team" Json.Decode.string
         |> Json.Decode.Pipeline.required "main_class" Json.Decode.string
         |> Json.Decode.Pipeline.required "price" Json.Decode.int
-        |> Json.Decode.Pipeline.required "total_score" Json.Decode.float
+        |> Json.Decode.Pipeline.required "total_score"
+            (Json.Decode.float
+                |> Json.Decode.nullable
+                |> Json.Decode.map (Maybe.withDefault 0)
+                )
         |> Json.Decode.Pipeline.required "rank" Json.Decode.int
         |> Json.Decode.Pipeline.required "matches_played" Json.Decode.int
-        |> Json.Decode.Pipeline.required "efficiency" Json.Decode.float
+        |> Json.Decode.Pipeline.required "efficiency"
+            (Json.Decode.float
+                |> Json.Decode.nullable
+                |> Json.Decode.map (Maybe.withDefault 0)
+                )
         |> Json.Decode.Pipeline.required "efficiency_rank" Json.Decode.int
 
 
