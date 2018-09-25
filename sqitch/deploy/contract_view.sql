@@ -5,7 +5,7 @@ begin;
     -- matches played?
     -- maps played?
 
-    create view contract_view as
+    create materialized view contract_view as
          select *
            from contract super
               , lateral (
