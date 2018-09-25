@@ -1,0 +1,21 @@
+%syntax-version=1.0.0
+%project=fantasy_tf2
+
+tournament 2018-09-25T12:00:00Z ldesgoui <ldesgoui@gmail.com> # table
+multiplier [tournament] 2018-09-25T12:00:00Z ldesgoui <ldesgoui@gmail.com> # table
+real_team [tournament] 2018-09-25T12:00:00Z ldesgoui <ldesgoui@gmail.com> # table
+main_class 2018-09-25T12:00:00Z ldesgoui <ldesgoui@gmail.com> # enum
+player [tournament real_team main_class] 2018-09-25T12:00:00Z ldesgoui <ldesgoui@gmail.com> # table
+manager 2018-09-25T12:00:00Z ldesgoui <ldesgoui@gmail.com> # table
+team [tournament manager] 2018-09-25T12:00:00Z ldesgoui <ldesgoui@gmail.com> # table
+btree_gist 2018-09-25T12:00:00Z ldesgoui <ldesgoui@gmail.com> # extension
+contract [tournament player manager team btree_gist] 2018-09-25T12:00:00Z ldesgoui <ldesgoui@gmail.com> # table
+manage [tournament real_team main_class player manager team contract] 2018-09-25T12:00:00Z ldesgoui <ldesgoui@gmail.com> # function
+match [tournament] 2018-09-25T12:00:00Z ldesgoui <ldesgoui@gmail.com> # table
+map [tournament match] 2018-09-25T12:00:00Z ldesgoui <ldesgoui@gmail.com> # table
+performance [tournament player match] 2018-09-25T12:00:00Z ldesgoui <ldesgoui@gmail.com> # table
+tournament_view 2018-09-25T13:11:25Z ldesgoui <ldesgoui@gmail.com> # view
+player_view 2018-09-25T13:11:35Z ldesgoui <ldesgoui@gmail.com> # view
+team_view 2018-09-25T13:11:55Z ldesgoui <ldesgoui@gmail.com> # view
+contract_view 2018-09-25T13:12:01Z ldesgoui <ldesgoui@gmail.com> # view
+performance_view 2018-09-25T13:12:08Z ldesgoui <ldesgoui@gmail.com> # view
