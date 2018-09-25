@@ -7,6 +7,7 @@ begin;
         , tournament text not null
         , description text
         , stage integer not null
+        , time timestamp not null default now()
         , primary key (id)
         , foreign key (tournament) references tournament
         );

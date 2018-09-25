@@ -2,7 +2,7 @@
 
 begin;
 
-    create table match_map
+    create table map
         ( url text not null
         , match integer not null
         , primary key (url)

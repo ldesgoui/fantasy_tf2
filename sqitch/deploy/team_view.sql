@@ -2,19 +2,22 @@
 
 begin;
 
+    -- rank
+    -- dense_rank
+    -- * score
+    -- * score_per_map
+
     create view team_view as
          select *
            from team super
               , lateral (
-                 select super.start_budget + sum(case when upper(time) is not null then coalesce(sale_pr
-ice, 0) - purchase_price else 0 end) as total_budget
-                      , super.start_budget + sum(coalesce(sale_price, 0) - purchase_price) as remaining_
-budget
+                 select super.start_budget + sum(sale_price - purchase_price) filter (where upper(time) is not null) as total_budget
+                      , super.start_budget + sum(coalesce(sale_price, 0) - purchase_price) as remaining_budget
                       , count(upper(time)) as transactions
-                   from contract
+                      , sum(score) as score
+                   from contract_view
                   where tournament = super.tournament
                     and manager = super.manager
-                      ) b
-                ;
+                      ) c;
 
 commit;
