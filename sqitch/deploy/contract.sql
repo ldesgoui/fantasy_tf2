@@ -21,4 +21,6 @@ begin;
         , foreign key (tournament, player) references player
         );
 
+    create index on contract (tournament, manager);
+
 commit;

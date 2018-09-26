@@ -2,15 +2,10 @@
 
 begin;
 
-    -- rank
-    -- dense_rank
-    -- * score
-    -- * score_per_map
-    -- * main_class
-    -- matches played ? maps played ?
-
     create view player_view as
          select *
+              , rank() over (partition by tournament, main_class order by score desc) as class_rank
+              , rank() over (partition by tournament order by score desc)
            from player super
               , lateral (
                  select sum(score) as score

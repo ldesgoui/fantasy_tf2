@@ -14,8 +14,9 @@ manage [tournament real_team main_class player manager team contract] 2018-09-25
 match [tournament] 2018-09-25T12:00:00Z ldesgoui <ldesgoui@gmail.com> # table
 map [tournament match] 2018-09-25T12:00:00Z ldesgoui <ldesgoui@gmail.com> # table
 performance [tournament player match] 2018-09-25T12:00:00Z ldesgoui <ldesgoui@gmail.com> # table
+private 2018-09-25T12:00:00Z ldesgoui <ldesgoui@gmail.com> # schema
 tournament_view [tournament real_team player team contract] 2018-09-25T12:00:00Z ldesgoui <ldesgoui@gmail.com> # view
 performance_view [performance multiplier] 2018-09-25T12:00:00Z ldesgoui <ldesgoui@gmail.com> # view
 player_view [player performance_view] 2018-09-25T12:00:00Z ldesgoui <ldesgoui@gmail.com> # view
 contract_view [contract performance_view match map] 2018-09-25T12:00:00Z ldesgoui <ldesgoui@gmail.com> # view
-team_view [team contract_view] 2018-09-25T12:00:00Z ldesgoui <ldesgoui@gmail.com> # view
+team_view [team contract_view private] 2018-09-25T12:00:00Z ldesgoui <ldesgoui@gmail.com> # view

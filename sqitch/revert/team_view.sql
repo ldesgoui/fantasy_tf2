@@ -3,5 +3,6 @@
 begin;
 
     drop view team_view;
+    drop materialized view private.team_view_helper;
 
 commit;

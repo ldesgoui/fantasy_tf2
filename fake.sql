@@ -93,9 +93,19 @@ insert into contract
   lateral (select * from player order by random() limit 6) j;
 
 insert into match values (0, 'i63', null, 0);
+insert into match values (1, 'i63', null, 0, now() + interval '2 hours');
 insert into map values ('0', 0);
+insert into map values ('1', 1);
 insert into performance
     select '0'
+         , 'i63'
+         , player_id
+         , generate_series
+         , ((random() * 30)::int)::float
+      from player,
+   lateral generate_series(1, 30);
+insert into performance
+    select '1'
          , 'i63'
          , player_id
          , generate_series
@@ -109,5 +119,8 @@ insert into multiplier values ('i63', '3', -2);
 insert into multiplier values ('i63', '4', 1);
 insert into multiplier values ('i63', '5', 10);
 insert into multiplier values ('i63', '6', -2);
+
+refresh materialized view contract_view;
+refresh materialized view private.team_view_helper;
 
 commit;
