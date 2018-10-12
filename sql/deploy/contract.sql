@@ -3,8 +3,7 @@
 begin;
 
     create table contract
-        ( id serial not null
-        , tournament text not null
+        ( tournament text not null
         , manager text not null
         , player text not null
         , time tsrange not null
@@ -16,7 +15,7 @@ begin;
             , player with =
             , time with &&
             )
-        , primary key (id)
+        , primary key (tournament, manager, player, time)
         , foreign key (tournament) references tournament
         , foreign key (manager) references manager
         , foreign key (tournament, manager) references team

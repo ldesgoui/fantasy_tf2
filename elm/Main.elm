@@ -174,7 +174,7 @@ loadPlayer slug id =
 loadTeam : String -> String -> Cmd Msg
 loadTeam slug id =
     Http.get "http://10.233.1.2/api/tournament_view"
-        |> Http.withQueryParam "select" "*,team_view(*),contract_view(*)"
+        |> Http.withQueryParam "select" "*,team_view(*),contract_view(*,start_time,end_time)"
         |> Http.withQueryParam "slug" ("eq." ++ slug)
         |> Http.withQueryParam "team_view.manager" ("eq." ++ id)
         |> Http.withQueryParam "contract_view.manager" ("eq." ++ id)
@@ -188,7 +188,7 @@ loadTeam slug id =
 loadManage : String -> String -> Cmd Msg
 loadManage slug id =
     Http.get "http://10.233.1.2/api/tournament_view"
-        |> Http.withQueryParam "select" "*,player(*),team_view(*),contract_view(*)"
+        |> Http.withQueryParam "select" "*,player(*),team_view(*),contract_view(*,start_time,end_time)"
         |> Http.withQueryParam "slug" ("eq." ++ slug)
         |> Http.withQueryParam "team_view.manager" ("eq." ++ id)
         |> Http.withQueryParam "contract_view.manager" ("eq." ++ id)

@@ -11,5 +11,4 @@ begin;
         on multiplier.tournament = performance.tournament
        and multiplier.statistic = performance.statistic;
 
-
 commit;

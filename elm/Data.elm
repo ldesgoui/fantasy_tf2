@@ -1,18 +1,17 @@
 module Data exposing (..)
 
+import Iso8601
 import Json.Decode exposing (..)
 import Json.Decode.Pipeline exposing (..)
 import Set
-
-
--- TODO
+import Time
 
 
 type alias Tournament =
     { slug : String
     , name : String
-    , startTime : String
-    , endTime : Maybe String
+    , startTime : Time.Posix
+    , endTime : Maybe Time.Posix
     , startBudget : Int
     , transactions : Int
     , realTeamCount : Int
@@ -26,24 +25,43 @@ type alias Team =
     { tournament : String
     , manager : String
     , name : String
+    , transactions : Int
+    , rank : Int
+    , score : Float
     , startBudget : Int
     , totalBudget : Int
     , remainingBudget : Int
-    , transactions : Int
     }
 
 
 type alias Player =
-    {}
+    { tournament : String
+    , playerId : String
+    , realTeam : String
+    , name : String
+    , price : Int
+    , classRank : Int
+    , rank : Int
+    , score : Float
+    , scorePerMap : Float
+    }
 
 
 type alias Contract =
-    {}
+    { tournament : String
+    , manager : String
+    , player : String
+    , purchasePrice : Int
+    , salePrice : Maybe Int
+    , startTime : Time.Posix
+    , endTime : Maybe Time.Posix
+    , score : Float
+    , scorePerMap : Float
+    }
 
 
 
 -- JSON
--- TODO
 
 
 decodeTournament : Decoder Tournament
@@ -51,8 +69,8 @@ decodeTournament =
     succeed Tournament
         |> required "slug" string
         |> required "name" string
-        |> required "start_time" string
-        |> required "end_time" (maybe string)
+        |> required "start_time" iso8601
+        |> required "end_time" (maybe iso8601)
         |> required "start_budget" int
         |> required "transactions" int
         |> required "real_team_count" int
@@ -67,20 +85,54 @@ decodeTeam =
         |> required "tournament" string
         |> required "manager" string
         |> required "name" string
+        |> required "transactions" int
+        |> required "rank" int
+        |> required "score" float
         |> required "start_budget" int
         |> required "total_budget" int
         |> required "remaining_budget" int
-        |> required "transactions" int
 
 
 decodePlayer : Decoder Player
 decodePlayer =
-    succeed {}
+    succeed Player
+        |> required "tournament" string
+        |> required "player_id" string
+        |> required "real_team" string
+        |> required "name" string
+        |> required "price" int
+        |> required "rank" int
+        |> required "class_rank" int
+        |> required "score" float
+        |> required "score_per_map" float
 
 
 decodeContract : Decoder Contract
 decodeContract =
-    succeed {}
+    succeed Contract
+        |> required "tournament" string
+        |> required "manager" string
+        |> required "player" string
+        |> required "purchase_price" int
+        |> required "sale_price" (maybe int)
+        |> required "start_time" iso8601
+        |> required "end_time" (maybe iso8601)
+        |> required "score" float
+        |> required "score_per_map" float
+
+
+iso8601 : Decoder Time.Posix
+iso8601 =
+    andThen
+        (\str ->
+            case Iso8601.toTime (str ++ "Z") of
+                Ok v ->
+                    succeed v
+
+                Err _ ->
+                    fail "Expected ISO-8601 datetime string"
+        )
+        string
 
 
 

@@ -13,12 +13,27 @@ begin;
      left join map on performance_view.map = map.url
      left join match on map.match = match.id
          where contract.time @> match.time
-      group by contract.id
-             , contract.tournament
+      group by contract.tournament
              , contract.manager
              , contract.player
              , contract.time
              , contract.purchase_price
              , contract.sale_price;
+
+    create function start_time(contract_view)
+            returns timestamp
+           language sql
+             strict
+                 as $$
+        select lower($1.time);
+    $$;
+
+    create function end_time(contract_view)
+            returns timestamp
+           language sql
+             strict
+                 as $$
+        select upper($1.time);
+    $$;
 
 commit;
