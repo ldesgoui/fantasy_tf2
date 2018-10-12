@@ -2,6 +2,6 @@
 
 begin;
 
-    drop materialized view contract_view;
+    drop view contract_view;
 
 commit;

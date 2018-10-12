@@ -23,7 +23,7 @@ fromUrl : Url.Url -> Maybe Route
 fromUrl url =
     let
         parser =
-            s "frontend"
+            s "elm"
                 </> s "Main.elm"
                 </> oneOf
                         [ map Home top
@@ -70,4 +70,4 @@ toString route =
                 Admin ->
                     [ "admin" ]
     in
-    "/frontend/Main.elm/" ++ String.join "/" pieces
+    "/elm/Main.elm/" ++ String.join "/" pieces

@@ -105,7 +105,7 @@ decodeTournamentData =
                 , teams = teams
                 }
             )
-        |> required "player" (list decodePlayer)
+        |> required "player_view" (list decodePlayer)
         |> required "team_view" (list decodeTeam)
 
 
@@ -117,7 +117,7 @@ decodePlayerData =
                 , player = player
                 }
             )
-        |> required "player" (index 0 decodePlayer)
+        |> required "player_view" (index 0 decodePlayer)
 
 
 decodeTeamData =
@@ -130,7 +130,7 @@ decodeTeamData =
                 }
             )
         |> required "team_view" (index 0 decodeTeam)
-        |> required "contract" (list decodeContract)
+        |> required "contract_view" (list decodeContract)
 
 
 decodeManageData =
@@ -144,6 +144,6 @@ decodeManageData =
                 , selectedRoster = Set.empty
                 }
             )
-        |> required "player" (list decodePlayer)
+        |> required "player_view" (list decodePlayer)
         |> required "team_view" (index 0 decodeTeam)
-        |> required "contract" (list decodeContract)
+        |> required "contract_view" (list decodeContract)

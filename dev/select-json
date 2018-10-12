@@ -1,0 +1,12 @@
+#! /usr/bin/env nix-shell
+#! nix-shell -i sh -p postgresql
+
+if [[ -z $1 ]]; then
+    echo "usage: $0 <sql query ...>"
+    exit 1
+fi
+
+psql -Xt << END | jq '.'
+    select row_to_json(a)
+      from ( $@ ) a;
+END

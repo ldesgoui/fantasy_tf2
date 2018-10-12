@@ -1,0 +1,9 @@
+#! /usr/bin/env nix-shell
+#! nix-shell -i sh -p nix-prefetch-git
+
+cd "$(dirname "$0")"
+
+nix-prefetch-git \
+    https://github.com/nixos/nixpkgs-channels.git \
+    refs/heads/nixos-18.03-small \
+    > ../nix/pin.json

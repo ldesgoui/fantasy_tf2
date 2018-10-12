@@ -149,7 +149,7 @@ loadHome =
 loadTournament : String -> Cmd Msg
 loadTournament slug =
     Http.get "http://10.233.1.2/api/tournament_view"
-        |> Http.withQueryParam "select" "*,player(*),team_view(*)"
+        |> Http.withQueryParam "select" "*,player_view(*),team_view(*)"
         |> Http.withQueryParam "slug" ("eq." ++ slug)
         |> Http.withHeader "Accept" "application/vnd.pgrst.object+json"
         |> Http.withExpectJson Data.decodeTournamentData
@@ -161,9 +161,9 @@ loadTournament slug =
 loadPlayer : String -> String -> Cmd Msg
 loadPlayer slug id =
     Http.get "http://10.233.1.2/api/tournament_view"
-        |> Http.withQueryParam "select" "*,player(*)"
+        |> Http.withQueryParam "select" "*,player_view(*)"
         |> Http.withQueryParam "slug" ("eq." ++ slug)
-        |> Http.withQueryParam "player.player_id" ("eq." ++ id)
+        |> Http.withQueryParam "player_view.player_id" ("eq." ++ id)
         |> Http.withHeader "Accept" "application/vnd.pgrst.object+json"
         |> Http.withExpectJson Data.decodePlayerData
         |> Http.toRequest
@@ -174,10 +174,10 @@ loadPlayer slug id =
 loadTeam : String -> String -> Cmd Msg
 loadTeam slug id =
     Http.get "http://10.233.1.2/api/tournament_view"
-        |> Http.withQueryParam "select" "*,team_view(*),contract(*)"
+        |> Http.withQueryParam "select" "*,team_view(*),contract_view(*)"
         |> Http.withQueryParam "slug" ("eq." ++ slug)
-        |> Http.withQueryParam "team.manager" ("eq." ++ id)
-        |> Http.withQueryParam "contract.manager" ("eq." ++ id)
+        |> Http.withQueryParam "team_view.manager" ("eq." ++ id)
+        |> Http.withQueryParam "contract_view.manager" ("eq." ++ id)
         |> Http.withHeader "Accept" "application/vnd.pgrst.object+json"
         |> Http.withExpectJson Data.decodeTeamData
         |> Http.toRequest
@@ -188,10 +188,10 @@ loadTeam slug id =
 loadManage : String -> String -> Cmd Msg
 loadManage slug id =
     Http.get "http://10.233.1.2/api/tournament_view"
-        |> Http.withQueryParam "select" "*,player(*),team_view(*),contract(*)"
+        |> Http.withQueryParam "select" "*,player(*),team_view(*),contract_view(*)"
         |> Http.withQueryParam "slug" ("eq." ++ slug)
-        |> Http.withQueryParam "team.manager" ("eq." ++ id)
-        |> Http.withQueryParam "contract.manager" ("eq." ++ id)
+        |> Http.withQueryParam "team_view.manager" ("eq." ++ id)
+        |> Http.withQueryParam "contract_view.manager" ("eq." ++ id)
         |> Http.withHeader "Accept" "application/vnd.pgrst.object+json"
         |> Http.withExpectJson Data.decodeManageData
         |> Http.toRequest
@@ -211,8 +211,8 @@ view model =
         [ Html.node "style" [] [ Html.text "a{display:block}" ]
         , Html.a [ Route.href Route.Home ] [ Html.text "homepage" ]
         , Html.a [ Route.href (Route.Tournament "i63") ] [ Html.text "tournament" ]
-        , Html.a [ Route.href (Route.Player "i63" "1") ] [ Html.text "player" ]
-        , Html.a [ Route.href (Route.Team "i63" "A") ] [ Html.text "team" ]
+        , Html.a [ Route.href (Route.Player "i63" "[U:1:171355038]") ] [ Html.text "player" ]
+        , Html.a [ Route.href (Route.Team "i63" "1") ] [ Html.text "team" ]
         , Html.a [ Route.href (Route.Manage "i63") ] [ Html.text "manage" ]
         , Html.a [ Route.href Route.Admin ] [ Html.text "admin" ]
         , Html.text (Debug.toString model.session)

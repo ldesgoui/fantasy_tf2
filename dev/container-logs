@@ -1,0 +1,11 @@
+#! /usr/bin/env nix-shell
+#! nix-shell -i "sudo sh" -p jq
+
+cd "$(dirname "$0")"
+
+journalctl \
+    --follow \
+    --machine server \
+    --output json \
+    --priority 0..7 \
+    | jq -rf ./journalctl.jq

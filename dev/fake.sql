@@ -73,7 +73,7 @@ i63	[U:1:99996681]	BaBs	Timed Out	medic	14000
 
 insert into manager select generate_series, generate_series from generate_series(1, 1000);
 insert into team select 'i63', generate_series, generate_series, 140000 from generate_series(1, 1000);
-insert into contract
+insert into contract (tournament, manager, player, time, purchase_price, sale_price)
    select 'i63'
         , generate_series
         , player_id
@@ -83,7 +83,7 @@ insert into contract
      from generate_series(1, 1000),
   lateral (select * from player order by random() limit 6) j;
 
-insert into contract
+insert into contract (tournament, manager, player, time, purchase_price)
    select 'i63'
         , generate_series
         , player_id

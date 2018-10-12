@@ -1,0 +1,9 @@
+#!/bin/sh
+
+if [[ $_ == $0 ]]; then
+    echo "usage: source $0"
+    exit 1
+fi
+
+export PGHOST=10.233.1.2
+export PGUSER=postgres

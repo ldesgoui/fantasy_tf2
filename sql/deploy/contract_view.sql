@@ -13,7 +13,8 @@ begin;
      left join map on performance_view.map = map.url
      left join match on map.match = match.id
          where contract.time @> match.time
-      group by contract.tournament
+      group by contract.id
+             , contract.tournament
              , contract.manager
              , contract.player
              , contract.time
