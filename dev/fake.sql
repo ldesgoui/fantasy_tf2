@@ -120,7 +120,7 @@ insert into multiplier values ('i63', '4', 1);
 insert into multiplier values ('i63', '5', 10);
 insert into multiplier values ('i63', '6', -2);
 
-refresh materialized view contract_view;
+-- refresh materialized view contract_view;
 refresh materialized view private.team_view_helper;
 
 commit;

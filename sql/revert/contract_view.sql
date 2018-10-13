@@ -4,6 +4,6 @@ begin;
 
     drop function start_time(contract_view);
     drop function end_time(contract_view);
-    drop materialized view contract_view;
+    drop view contract_view;
 
 commit;

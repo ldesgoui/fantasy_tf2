@@ -1,0 +1,6 @@
+:2015 {
+    rewrite {
+        if {path} not_match ^/(auth|api)/
+        to {path} {path}/ /
+    }
+}

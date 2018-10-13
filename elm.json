@@ -17,6 +17,7 @@
             "elm-community/json-extra": "4.0.0",
             "krisajenkins/remotedata": "5.0.0",
             "lukewestby/elm-http-builder": "6.0.0",
+            "mdgriffith/elm-ui": "1.1.0",
             "rtfeldman/elm-iso8601-date-strings": "1.1.2"
         },
         "indirect": {

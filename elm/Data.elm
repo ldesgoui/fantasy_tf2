@@ -193,7 +193,18 @@ decodeManageData =
                 , players = players
                 , team = team
                 , contracts = contracts
-                , selectedRoster = Set.empty
+                , selectedRoster =
+                    contracts
+                        |> List.filterMap
+                            (\c ->
+                                case c.endTime of
+                                    Nothing ->
+                                        Just c.player
+
+                                    _ ->
+                                        Nothing
+                            )
+                        |> Set.fromList
                 }
             )
         |> required "player_view" (list decodePlayer)

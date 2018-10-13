@@ -13,6 +13,9 @@ type Msg
     | LinkClicked Browser.UrlRequest
     | UrlChanged Url.Url
     | Logout
+    | TeamNameChanged String
+    | PlayerToggled String
+    | TeamSubmitted
     | LoadedHome
         (WebData
             { tournaments : List Tournament

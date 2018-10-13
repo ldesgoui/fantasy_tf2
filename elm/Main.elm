@@ -4,8 +4,6 @@ import Browser
 import Browser.Navigation as Nav
 import Cmd.Extra exposing (..)
 import Data exposing (..)
-import Html
-import Html.Attributes as Html
 import HttpBuilder as Http
 import Model exposing (..)
 import Msg exposing (..)
@@ -14,6 +12,7 @@ import RemoteData exposing (RemoteData(..), WebData)
 import Route exposing (Route)
 import Session exposing (Session(..))
 import Set
+import Ui
 import Url
 
 
@@ -46,7 +45,7 @@ init : Flags -> Url.Url -> Nav.Key -> ModelWithCmd
 init flags url key =
     { key = key
     , page = Page.Home NotAsked
-    , session = Anonymous
+    , session = Manager { managerId = "1" }
     }
         |> urlUpdate url
 
@@ -59,7 +58,13 @@ update : Msg -> Model -> ModelWithCmd
 update msg model =
     case ( msg, model.page ) of
         ( LinkClicked (Browser.Internal url), _ ) ->
-            model |> withCmd (Nav.pushUrl model.key (Url.toString url))
+            model
+                |> withCmd
+                    (if url.path |> String.startsWith "/auth/" then
+                        Nav.load (Url.toString url)
+                     else
+                        Nav.pushUrl model.key (Url.toString url)
+                    )
 
         ( LinkClicked (Browser.External href), _ ) ->
             model |> withCmd (Nav.load href)
@@ -70,6 +75,34 @@ update msg model =
         ( Logout, _ ) ->
             -- TODO destroy localStorage.session
             { model | session = Anonymous } |> withNoCmd
+
+        ( TeamNameChanged newName, Page.Manage (Success ({ team } as data)) ) ->
+            { model
+                | page =
+                    { data | team = { team | name = newName } }
+                        |> Success
+                        |> Page.Manage
+            }
+                |> withNoCmd
+
+        ( PlayerToggled playerId, Page.Manage (Success data) ) ->
+            { model
+                | page =
+                    { data
+                        | selectedRoster =
+                            if Set.member playerId data.selectedRoster then
+                                Set.remove playerId data.selectedRoster
+                            else
+                                Set.insert playerId data.selectedRoster
+                    }
+                        |> Success
+                        |> Page.Manage
+            }
+                |> withNoCmd
+
+        ( TeamSubmitted, Page.Manage (Success data) ) ->
+            -- TODO
+            model |> withNoCmd
 
         ( LoadedHome data, Page.Home _ ) ->
             { model | page = Page.Home data } |> withNoCmd
@@ -96,6 +129,7 @@ update msg model =
 
 urlUpdate : Url.Url -> Model -> ModelWithCmd
 urlUpdate url model =
+    -- TODO: check AUTH
     case Route.fromUrl url of
         Nothing ->
             { model | page = Page.Error { error = "Page not found" } }
@@ -188,7 +222,7 @@ loadTeam slug id =
 loadManage : String -> String -> Cmd Msg
 loadManage slug id =
     Http.get "http://10.233.1.2/api/tournament_view"
-        |> Http.withQueryParam "select" "*,player(*),team_view(*),contract_view(*,start_time,end_time)"
+        |> Http.withQueryParam "select" "*,player_view(*),team_view(*),contract_view(*,start_time,end_time)"
         |> Http.withQueryParam "slug" ("eq." ++ slug)
         |> Http.withQueryParam "team_view.manager" ("eq." ++ id)
         |> Http.withQueryParam "contract_view.manager" ("eq." ++ id)
@@ -205,18 +239,6 @@ loadManage slug id =
 
 view : Model -> Browser.Document Msg
 view model =
-    { title = "fantasy.tf2.gg" -- TODO
-    , body =
-        -- TODO
-        [ Html.node "style" [] [ Html.text "a{display:block}" ]
-        , Html.a [ Route.href Route.Home ] [ Html.text "homepage" ]
-        , Html.a [ Route.href (Route.Tournament "i63") ] [ Html.text "tournament" ]
-        , Html.a [ Route.href (Route.Player "i63" "[U:1:171355038]") ] [ Html.text "player" ]
-        , Html.a [ Route.href (Route.Team "i63" "1") ] [ Html.text "team" ]
-        , Html.a [ Route.href (Route.Manage "i63") ] [ Html.text "manage" ]
-        , Html.a [ Route.href Route.Admin ] [ Html.text "admin" ]
-        , Html.text (Debug.toString model.session)
-        , Html.br [] []
-        , Html.text (Debug.toString model.page)
-        ]
+    { title = "fantasy.tf2.gg"
+    , body = Ui.document model
     }

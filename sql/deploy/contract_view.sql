@@ -2,7 +2,7 @@
 
 begin;
 
-    create materialized view contract_view as
+    create view contract_view as
         select contract.*
              , sum(score) as score
              , sum(score) / count(distinct map) as score_per_map

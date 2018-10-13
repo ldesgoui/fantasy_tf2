@@ -23,16 +23,14 @@ fromUrl : Url.Url -> Maybe Route
 fromUrl url =
     let
         parser =
-            s "elm"
-                </> s "Main.elm"
-                </> oneOf
-                        [ map Home top
-                        , map Admin (s "admin")
-                        , map Tournament string
-                        , map Player (string </> s "player" </> string)
-                        , map Team (string </> s "team" </> string)
-                        , map Manage (string </> s "manage")
-                        ]
+            oneOf
+                [ map Home top
+                , map Admin (s "admin")
+                , map Tournament string
+                , map Player (string </> s "player" </> string)
+                , map Team (string </> s "team" </> string)
+                , map Manage (string </> s "manage")
+                ]
     in
     parse parser url
 
@@ -70,4 +68,4 @@ toString route =
                 Admin ->
                     [ "admin" ]
     in
-    "/elm/Main.elm/" ++ String.join "/" pieces
+    "/" ++ String.join "/" pieces
