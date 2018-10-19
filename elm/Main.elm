@@ -12,6 +12,7 @@ import RemoteData exposing (RemoteData(..), WebData)
 import Route exposing (Route)
 import Session exposing (Session(..))
 import Set
+import Theme exposing (Theme)
 import Ui
 import Url
 
@@ -46,6 +47,7 @@ init flags url key =
     { key = key
     , page = Page.Home NotAsked
     , session = Manager { managerId = "1" }
+    , theme = Theme.spyTechRed
     }
         |> urlUpdate url
 
@@ -57,14 +59,12 @@ init flags url key =
 update : Msg -> Model -> ModelWithCmd
 update msg model =
     case ( msg, model.page ) of
+        ( ToggleTheme, _ ) ->
+            { model | theme = Theme.opposite model.theme }
+                |> withNoCmd
+
         ( LinkClicked (Browser.Internal url), _ ) ->
-            model
-                |> withCmd
-                    (if url.path |> String.startsWith "/auth/" then
-                        Nav.load (Url.toString url)
-                     else
-                        Nav.pushUrl model.key (Url.toString url)
-                    )
+            model |> withCmd (Nav.pushUrl model.key (Url.toString url))
 
         ( LinkClicked (Browser.External href), _ ) ->
             model |> withCmd (Nav.load href)
@@ -169,6 +169,7 @@ urlUpdate url model =
 
 
 -- HTTP
+-- TODO: Filter columns that are not used to prevent massive data transfer that's literally useless
 
 
 loadHome : Cmd Msg

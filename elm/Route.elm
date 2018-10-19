@@ -1,13 +1,10 @@
 module Route exposing (..)
 
 import Browser.Navigation as Nav
-import Html
-import Html.Attributes as Html
+import Data exposing (..)
 import Url
+import Url.Builder as Builder
 import Url.Parser as Parser exposing (..)
-
-
--- TODO: debug/prod
 
 
 type Route
@@ -33,11 +30,6 @@ fromUrl url =
                 ]
     in
     parse parser url
-
-
-href : Route -> Html.Attribute msg
-href targetRoute =
-    Html.href (toString targetRoute)
 
 
 replaceUrl : Nav.Key -> Route -> Cmd msg
@@ -68,4 +60,4 @@ toString route =
                 Admin ->
                     [ "admin" ]
     in
-    "/" ++ String.join "/" pieces
+    Builder.absolute pieces []

@@ -10,6 +10,7 @@ import Url
 
 type Msg
     = NothingHappened
+    | ToggleTheme
     | LinkClicked Browser.UrlRequest
     | UrlChanged Url.Url
     | Logout
