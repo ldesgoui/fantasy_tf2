@@ -1,18 +1,20 @@
 module Main exposing (..)
 
+import Api
 import Browser
 import Browser.Navigation as Nav
+import Cache
 import Cmd.Extra exposing (..)
 import Data exposing (..)
-import HttpBuilder as Http
+import Dict exposing (Dict)
+import Http
 import Model exposing (..)
 import Msg exposing (..)
-import Page exposing (Page)
-import RemoteData exposing (RemoteData(..), WebData)
 import Route exposing (Route)
 import Session exposing (Session(..))
 import Set
 import Theme exposing (Theme)
+import Time
 import Ui
 import Url
 
@@ -25,10 +27,8 @@ main =
     Browser.application
         { init = init
         , view = view
-        , update =
-            \msg model ->
-                Debug.log "post-update" (update (Debug.log "msg" msg) model)
-        , subscriptions = \_ -> Sub.none
+        , update = update
+        , subscriptions = subscriptions
         , onUrlChange = UrlChanged
         , onUrlRequest = LinkClicked
         }
@@ -42,84 +42,121 @@ type alias Flags =
     {}
 
 
-init : Flags -> Url.Url -> Nav.Key -> ModelWithCmd
+init : Flags -> Url.Url -> Nav.Key -> ModelAndCmd
 init flags url key =
-    { key = key
-    , page = Page.Home NotAsked
-    , session = Manager { managerId = "1" }
-    , theme = Theme.spyTechRed
-    }
+    Model.initial key
         |> urlUpdate url
+
+
+
+-- SUBSCRIPTIONS
+
+
+subscriptions : Model -> Sub Msg
+subscriptions model =
+    Time.every 1000 Tick
 
 
 
 -- UPDATE
 
 
-update : Msg -> Model -> ModelWithCmd
+update : Msg -> Model -> ModelAndCmd
 update msg model =
-    case ( msg, model.page ) of
-        ( ToggleTheme, _ ) ->
+    case msg of
+        ThemeToggled ->
             { model | theme = Theme.opposite model.theme }
                 |> withNoCmd
 
-        ( LinkClicked (Browser.Internal url), _ ) ->
+        LinkClicked (Browser.Internal url) ->
             model |> withCmd (Nav.pushUrl model.key (Url.toString url))
 
-        ( LinkClicked (Browser.External href), _ ) ->
+        LinkClicked (Browser.External href) ->
             model |> withCmd (Nav.load href)
 
-        ( UrlChanged url, _ ) ->
+        UrlChanged url ->
             model |> urlUpdate url
 
-        ( Logout, _ ) ->
+        Logout ->
             -- TODO destroy localStorage.session
             { model | session = Anonymous } |> withNoCmd
 
-        ( TeamNameChanged newName, Page.Manage (Success ({ team } as data)) ) ->
-            { model
-                | page =
-                    { data | team = { team | name = newName } }
-                        |> Success
-                        |> Page.Manage
-            }
+        TeamNameChanged newName ->
+            model
                 |> withNoCmd
 
-        ( PlayerToggled playerId, Page.Manage (Success data) ) ->
-            { model
-                | page =
-                    { data
-                        | selectedRoster =
-                            if Set.member playerId data.selectedRoster then
-                                Set.remove playerId data.selectedRoster
-                            else
-                                Set.insert playerId data.selectedRoster
-                    }
-                        |> Success
-                        |> Page.Manage
-            }
+        PlayerToggled _ ->
+            model
                 |> withNoCmd
 
-        ( TeamSubmitted, Page.Manage (Success data) ) ->
+        TeamSubmitted ->
             -- TODO
             model |> withNoCmd
 
-        ( LoadedHome data, Page.Home _ ) ->
-            { model | page = Page.Home data } |> withNoCmd
+        Tick t ->
+            { model | now = t } |> withNoCmd
 
-        ( LoadedTournament data, Page.Tournament _ ) ->
-            { model | page = Page.Tournament data } |> withNoCmd
+        LoadedTournaments (Ok tournaments) ->
+            { model
+                | tournaments =
+                    tournaments
+                        |> List.map
+                            (\t ->
+                                ( tournamentPk t
+                                , Cache.entry model.now t
+                                )
+                            )
+                        |> Dict.fromList
+                        |> flip Dict.union model.tournaments
+            }
+                |> withNoCmd
 
-        ( LoadedPlayer data, Page.Player _ ) ->
-            { model | page = Page.Player data } |> withNoCmd
+        LoadedTeams (Ok teams) ->
+            { model
+                | teams =
+                    teams
+                        |> List.map
+                            (\t ->
+                                ( teamPk t
+                                , Cache.entry model.now t
+                                )
+                            )
+                        |> Dict.fromList
+                        |> flip Dict.union model.teams
+            }
+                |> withNoCmd
 
-        ( LoadedTeam data, Page.Team _ ) ->
-            { model | page = Page.Team data } |> withNoCmd
+        LoadedPlayers (Ok players) ->
+            { model
+                | players =
+                    players
+                        |> List.map
+                            (\t ->
+                                ( playerPk t
+                                , Cache.entry model.now t
+                                )
+                            )
+                        |> Dict.fromList
+                        |> flip Dict.union model.players
+            }
+                |> withNoCmd
 
-        ( LoadedManage data, Page.Manage _ ) ->
-            { model | page = Page.Manage data } |> withNoCmd
+        LoadedContracts (Ok contracts) ->
+            { model
+                | contracts =
+                    contracts
+                        |> List.map
+                            (\t ->
+                                ( contractPk t
+                                , Cache.entry model.now t
+                                )
+                            )
+                        |> Dict.fromList
+                        |> flip Dict.union model.contracts
+            }
+                |> withNoCmd
 
-        ( _, _ ) ->
+        _ ->
             model |> withNoCmd
 
 
@@ -127,111 +164,14 @@ update msg model =
 -- ROUTER
 
 
-urlUpdate : Url.Url -> Model -> ModelWithCmd
+urlUpdate : Url.Url -> Model -> ModelAndCmd
 urlUpdate url model =
-    -- TODO: check AUTH
-    case Route.fromUrl url of
-        Nothing ->
-            { model | page = Page.Error { error = "Page not found" } }
-                |> withNoCmd
+    { model
+        | route = Route.fromUrl url
 
-        Just Route.Home ->
-            { model | page = Page.Home Loading }
-                |> withCmd loadHome
-
-        Just (Route.Tournament tournamentSlug) ->
-            { model | page = Page.Tournament Loading }
-                |> withCmd (loadTournament tournamentSlug)
-
-        Just (Route.Player tournamentSlug playerId) ->
-            { model | page = Page.Player Loading }
-                |> withCmd (loadPlayer tournamentSlug playerId)
-
-        Just (Route.Team tournamentSlug teamId) ->
-            { model | page = Page.Team Loading }
-                |> withCmd (loadTeam tournamentSlug teamId)
-
-        Just (Route.Manage tournamentSlug) ->
-            case model.session of
-                Anonymous ->
-                    { model | page = Page.Error { error = "You must login to manage a team" } }
-                        |> withNoCmd
-
-                Manager { managerId } ->
-                    { model | page = Page.Manage Loading }
-                        |> withCmd (loadManage tournamentSlug managerId)
-
-        Just Route.Admin ->
-            -- TODO
-            model
-                |> withNoCmd
-
-
-
--- HTTP
--- TODO: Filter columns that are not used to prevent massive data transfer that's literally useless
-
-
-loadHome : Cmd Msg
-loadHome =
-    Http.get "http://10.233.1.2/api/tournament_view"
-        |> Http.withExpectJson Data.decodeHomeData
-        |> Http.toRequest
-        |> RemoteData.sendRequest
-        |> Cmd.map LoadedHome
-
-
-loadTournament : String -> Cmd Msg
-loadTournament slug =
-    Http.get "http://10.233.1.2/api/tournament_view"
-        |> Http.withQueryParam "select" "*,player_view(*),team_view(*)"
-        |> Http.withQueryParam "slug" ("eq." ++ slug)
-        |> Http.withHeader "Accept" "application/vnd.pgrst.object+json"
-        |> Http.withExpectJson Data.decodeTournamentData
-        |> Http.toRequest
-        |> RemoteData.sendRequest
-        |> Cmd.map LoadedTournament
-
-
-loadPlayer : String -> String -> Cmd Msg
-loadPlayer slug id =
-    Http.get "http://10.233.1.2/api/tournament_view"
-        |> Http.withQueryParam "select" "*,player_view(*)"
-        |> Http.withQueryParam "slug" ("eq." ++ slug)
-        |> Http.withQueryParam "player_view.player_id" ("eq." ++ id)
-        |> Http.withHeader "Accept" "application/vnd.pgrst.object+json"
-        |> Http.withExpectJson Data.decodePlayerData
-        |> Http.toRequest
-        |> RemoteData.sendRequest
-        |> Cmd.map LoadedPlayer
-
-
-loadTeam : String -> String -> Cmd Msg
-loadTeam slug id =
-    Http.get "http://10.233.1.2/api/tournament_view"
-        |> Http.withQueryParam "select" "*,team_view(*),contract_view(*,start_time,end_time)"
-        |> Http.withQueryParam "slug" ("eq." ++ slug)
-        |> Http.withQueryParam "team_view.manager" ("eq." ++ id)
-        |> Http.withQueryParam "contract_view.manager" ("eq." ++ id)
-        |> Http.withHeader "Accept" "application/vnd.pgrst.object+json"
-        |> Http.withExpectJson Data.decodeTeamData
-        |> Http.toRequest
-        |> RemoteData.sendRequest
-        |> Cmd.map LoadedTeam
-
-
-loadManage : String -> String -> Cmd Msg
-loadManage slug id =
-    Http.get "http://10.233.1.2/api/tournament_view"
-        |> Http.withQueryParam "select" "*,player_view(*),team_view(*),contract_view(*,start_time,end_time)"
-        |> Http.withQueryParam "slug" ("eq." ++ slug)
-        |> Http.withQueryParam "team_view.manager" ("eq." ++ id)
-        |> Http.withQueryParam "contract_view.manager" ("eq." ++ id)
-        |> Http.withHeader "Accept" "application/vnd.pgrst.object+json"
-        |> Http.withExpectJson Data.decodeManageData
-        |> Http.toRequest
-        |> RemoteData.sendRequest
-        |> Cmd.map LoadedManage
+        -- TODO: session
+    }
+        |> Api.loadCaches
 
 
 
@@ -243,3 +183,11 @@ view model =
     { title = "fantasy.tf2.gg"
     , body = Ui.document model
     }
+
+
+
+-- UTIL
+
+
+flip f a b =
+    f b a

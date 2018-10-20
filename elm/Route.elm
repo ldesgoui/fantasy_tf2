@@ -9,10 +9,10 @@ import Url.Parser as Parser exposing (..)
 
 type Route
     = Home
-    | Tournament String
-    | Player String String
-    | Team String String
-    | Manage String
+    | Tournament TournamentPk
+    | Player PlayerPk
+    | Team TeamPk
+    | Manage TournamentPk
     | Admin
 
 
@@ -24,8 +24,8 @@ fromUrl url =
                 [ map Home top
                 , map Admin (s "admin")
                 , map Tournament string
-                , map Player (string </> s "player" </> string)
-                , map Team (string </> s "team" </> string)
+                , map (\t -> Player << Tuple.pair t) (string </> s "player" </> string)
+                , map (\t -> Team << Tuple.pair t) (string </> s "team" </> string)
                 , map Manage (string </> s "manage")
                 ]
     in
@@ -45,17 +45,17 @@ toString route =
                 Home ->
                     []
 
-                Tournament tournamentSlug ->
-                    [ tournamentSlug ]
+                Tournament t ->
+                    [ t ]
 
-                Player tournamentSlug playerId ->
-                    [ tournamentSlug, "player", playerId ]
+                Player ( t, p ) ->
+                    [ t, "player", p ]
 
-                Team tournamentSlug teamId ->
-                    [ tournamentSlug, "team", teamId ]
+                Team ( t, m ) ->
+                    [ t, "team", m ]
 
-                Manage tournamentSlug ->
-                    [ tournamentSlug, "manage" ]
+                Manage t ->
+                    [ t, "manage" ]
 
                 Admin ->
                     [ "admin" ]

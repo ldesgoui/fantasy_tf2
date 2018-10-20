@@ -2,56 +2,28 @@ module Msg exposing (..)
 
 import Browser
 import Data exposing (..)
+import Http as Http
 import Model exposing (..)
-import RemoteData exposing (RemoteData, WebData)
 import Set exposing (Set)
+import Time
 import Url
 
 
 type Msg
     = NothingHappened
-    | ToggleTheme
+    | ThemeToggled
+    | Tick Time.Posix
     | LinkClicked Browser.UrlRequest
     | UrlChanged Url.Url
     | Logout
     | TeamNameChanged String
     | PlayerToggled String
     | TeamSubmitted
-    | LoadedHome
-        (WebData
-            { tournaments : List Tournament
-            }
-        )
-    | LoadedTournament
-        (WebData
-            { tournament : Tournament
-            , players : List Player
-            , teams : List Team
-            }
-        )
-    | LoadedPlayer
-        (WebData
-            { tournament : Tournament
-            , player : Player
-            }
-        )
-    | LoadedTeam
-        (WebData
-            { tournament : Tournament
-            , team : Team
-            , contracts : List Contract
-            }
-        )
-    | LoadedManage
-        (WebData
-            { tournament : Tournament
-            , players : List Player
-            , team : Team
-            , contracts : List Contract
-            , selectedRoster : Set String
-            }
-        )
+    | LoadedTournaments (Result Http.Error (List Tournament))
+    | LoadedTeams (Result Http.Error (List Team))
+    | LoadedPlayers (Result Http.Error (List Player))
+    | LoadedContracts (Result Http.Error (List Contract))
 
 
-type alias ModelWithCmd =
+type alias ModelAndCmd =
     ( Model, Cmd Msg )

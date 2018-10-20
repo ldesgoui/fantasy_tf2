@@ -7,12 +7,10 @@ import Css.Transitions as T exposing (transition)
 import Data exposing (..)
 import Html
 import Html.Styled exposing (..)
-import Html.Styled.Attributes as Attr exposing (..)
+import Html.Styled.Attributes as Attr exposing (css, href, rel, src)
 import Html.Styled.Events as Ev exposing (..)
 import Model exposing (Model)
 import Msg exposing (Msg)
-import Page exposing (Page)
-import RemoteData
 import Route exposing (Route)
 import Session exposing (Session)
 import Theme exposing (Theme)
@@ -20,41 +18,21 @@ import Theme exposing (Theme)
 
 document : Model -> List (Html.Html Msg)
 document model =
-    (case model.page of
-        Page.Home (RemoteData.Success pageData) ->
-            homePage model pageData
-
-        Page.Tournament (RemoteData.Success pageData) ->
-            tournamentPage model pageData
-
-        Page.Team (RemoteData.Success pageData) ->
-            teamPage model pageData
-
-        Page.Player (RemoteData.Success pageData) ->
-            playerPage model pageData
-
-        Page.Manage (RemoteData.Success pageData) ->
-            managePage model pageData
-
-        Page.Error pageData ->
-            errorPage model pageData
-
-        _ ->
-            errorPage model { error = "I don't know how to render this" }
-    )
-        |> List.append
-            [ node "link"
-                [ rel "stylesheet"
-                , href "https://fonts.googleapis.com/css?family=Roboto+Mono|Crimson+Text"
-                ]
-                []
-            , global
-                [ Global.body
-                    [ backgroundImage (url model.theme.background)
-                    , backgroundSize (px 512)
-                    ]
-                ]
+    [ node "link"
+        [ rel "stylesheet"
+        , href "https://fonts.googleapis.com/css?family=Roboto+Mono|Crimson+Text"
+        ]
+        []
+    , global
+        [ Global.body
+            [ backgroundImage (url model.theme.background)
+            , backgroundSize (px 512)
             ]
+        ]
+    , navigation model
+    , main_ [] []
+    , footer model
+    ]
         |> node "if-you-can-read-this-i-will-sue-your-ass" []
         |> toUnstyled
         |> List.singleton
@@ -65,37 +43,38 @@ navigation model =
     nav
         [ css
             [ displayFlex
-            , flexWrap Css.wrap
+            , flexWrap wrap
             , justifyContent center
             ]
         ]
-        [ case model.page of
-            Page.Home _ ->
+        [ case model.route of
+            Just Route.Home ->
                 empty
 
             _ ->
                 a
                     [ css [ navigationItemStyle model.theme ]
                     , route Route.Home
+                    , route (Route.Tournament "i63")
                     ]
                     [ text "Home" ]
         , let
-            f tournament =
+            f pk =
                 a
                     [ css [ navigationItemStyle model.theme ]
-                    , route <| Route.Tournament tournament.slug
+                    , route <| Route.Tournament pk
                     ]
-                    [ text tournament.name ]
+                    [ text "Tournament" ]
           in
-          case model.page of
-            Page.Team (RemoteData.Success { tournament }) ->
-                f tournament
+          case model.route of
+            Just (Route.Team ( t, _ )) ->
+                f t
 
-            Page.Player (RemoteData.Success { tournament }) ->
-                f tournament
+            Just (Route.Player ( t, _ )) ->
+                f t
 
-            Page.Manage (RemoteData.Success { tournament }) ->
-                f tournament
+            Just (Route.Manage t) ->
+                f t
 
             _ ->
                 empty
@@ -113,7 +92,7 @@ navigation model =
                 [ text "Login" ]
         , button
             [ css [ navigationItemStyle <| Theme.opposite model.theme ]
-            , onClick Msg.ToggleTheme
+            , onClick Msg.ThemeToggled
             ]
             [ text "Theme" ]
         ]
@@ -124,118 +103,154 @@ footer model =
     empty
 
 
-homePage model data =
-    [ navigation model
-    , div
-        [ css
-            [ backgroundImage (url "/assets/map_world.png")
-            ]
-        ]
-        [ img
-            [ src "/assets/map_world_resolution.png"
-            ]
-            []
-        , div [] []
-        , div [] []
-        , div [] []
-        , div [] []
-        ]
-    , div []
-        [ h1
-            [ css
-                [ fontFamilies [ qt "Crimson Text", serif.value ]
-                ]
-            ]
-            [ if model.session /= Session.Anonymous then
-                text "Welcome back to the "
-              else
-                text "Welcome to the "
-            , text "Gentlemann's Club For Statistical Evaluation Of Mercenary Performance "
-            , text "(Fantasy TF2 for short)"
-            ]
-        , p []
-            [ text "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Mauris elementum ultrices turpis ut volutpat. Quisque laoreet ullamcorper velit et aliquet. Praesent vel erat eleifend, facilisis ante eget, semper tortor. Sed non dolor scelerisque, vulputate lorem tempor, feugiat leo. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Phasellus vel quam vulputate, feugiat ex vel, convallis mi. Nullam accumsan tristique placerat. Sed quis tempus purus, quis rhoncus sapien. Donec mattis dapibus consequat. Proin iaculis placerat finibus."
-            ]
-        ]
-    , ul []
-        (data.tournaments
-            |> List.map (tournamentListItem model)
-        )
-    , footer model
-    ]
+
+{-
+
+      page : Model -> List (Html Msg)
+      page model =
+          case model.page of
+              Page.Home (RemoteData.Success pageData) ->
+                  homePage model pageData
+
+              Page.Tournament (RemoteData.Success pageData) ->
+                  tournamentPage model pageData
+
+              Page.Team (RemoteData.Success pageData) ->
+                  teamPage model pageData
+
+              Page.Player (RemoteData.Success pageData) ->
+                  playerPage model pageData
+
+              Page.Manage (RemoteData.Success pageData) ->
+                  managePage model pageData
+
+              Page.Error pageData ->
+                  errorPage model pageData
+
+              _ ->
+                  errorPage model { error = "I don't know how to render this" }
 
 
-tournamentListItem model tournament =
-    li []
-        [ a
-            [ route <| Route.Tournament tournament.slug
-            ]
-            [ text tournament.name ]
-        ]
+   homePage model data =
+       [ div
+           [ css
+               [ backgroundImage (url "/assets/map_world.png")
+               ]
+           ]
+           [ img
+               [ src "/assets/map_world_resolution.png"
+               ]
+               []
+           , div [] []
+           , div [] []
+           , div [] []
+           , div [] []
+           ]
+       , div []
+           [ h1
+               [ css
+                   [ fontFamilies [ qt "Crimson Text", serif.value ]
+                   ]
+               ]
+               [ if model.session /= Session.Anonymous then
+                   text "Welcome back to the "
+                 else
+                   text "Welcome to the "
+               , text "Gentlemann's Club For Statistical Evaluation Of Mercenary Performance "
+               , text "(Fantasy TF2 for short)"
+               ]
+           , p []
+               [ text "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Mauris elementum ultrices turpis ut volutpat. Quisque laoreet ullamcorper velit et aliquet. Praesent vel erat eleifend, facilisis ante eget, semper tortor. Sed non dolor scelerisque, vulputate lorem tempor, feugiat leo. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Phasellus vel quam vulputate, feugiat ex vel, convallis mi. Nullam accumsan tristique placerat. Sed quis tempus purus, quis rhoncus sapien. Donec mattis dapibus consequat. Proin iaculis placerat finibus."
+               ]
+           ]
+       , ul []
+           (data.tournaments
+               |> List.map (tournamentListItem model)
+           )
+       ]
 
 
-tournamentPage model data =
-    [ navigation model
-    , div []
-        [ text data.tournament.name
-        , a [ route <| Route.Manage data.tournament.slug ]
-            [ text "manage ur team!" ]
-        ]
-    , ul []
-        (data.players
-            |> List.map (playerLeaderboardItem model)
-        )
-    , ul []
-        (data.teams
-            |> List.map (teamLeaderboardItem model)
-        )
-    , footer model
-    ]
+   tournamentListItem model tournament =
+       li []
+           [ a
+               [ route <| Route.Tournament tournament.slug
+               ]
+               [ text tournament.name ]
+           ]
 
 
-playerLeaderboardItem model player =
-    li []
-        [ a
-            [ route <| Route.Player player.tournament player.playerId
-            ]
-            [ text player.name ]
-        ]
+   tournamentPage model data =
+       [ div []
+           [ text data.tournament.name
+           , a [ route <| Route.Manage data.tournament.slug ]
+               [ text "manage ur team!" ]
+           ]
+       , ul []
+           (data.players
+               |> List.map (playerLeaderboardItem model)
+           )
+       , ul []
+           (data.teams
+               |> List.map (teamLeaderboardItem model)
+           )
+       ]
 
 
-teamLeaderboardItem model team =
-    li []
-        [ a
-            [ route <| Route.Team team.tournament team.manager
-            ]
-            [ text team.name ]
-        ]
+   playerLeaderboardItem model player =
+       li []
+           [ a
+               [ route <| Route.Player player.tournament player.playerId
+               ]
+               [ text player.name ]
+           ]
 
 
-teamPage model data =
-    [ navigation model
-    , footer model
-    ]
+   teamLeaderboardItem model team =
+       li []
+           [ a
+               [ route <| Route.Team team.tournament team.manager
+               ]
+               [ text team.name ]
+           ]
 
 
-playerPage model data =
-    [ navigation model
-    , footer model
-    ]
+   teamPage model data =
+       [ div []
+           [ text data.team.name ]
+       , ul []
+           (data.contracts
+               |> List.filter (\c -> c.endTime == Nothing)
+               |> List.map (rosterItem model)
+           )
+       , ul []
+           (data.contracts
+               |> List.filter (\c -> c.endTime /= Nothing)
+               |> List.map (contractHistoryItem model)
+           )
+       ]
 
 
-managePage model data =
-    [ navigation model
-    , footer model
-    ]
+   rosterItem model contract =
+       empty
 
 
-errorPage model data =
-    [ navigation model
-    , footer model
-    ]
+   contractHistoryItem model contract =
+       empty
 
 
+   playerPage model data =
+       []
 
+
+   managePage model data =
+       []
+
+
+   errorPage model data =
+       []
+
+
+-}
 -- STYLE
 
 
@@ -245,40 +260,61 @@ navigationItemStyle theme =
         textColor =
             rgb 232 199 191
     in
-    Css.batch
+    batch
         [ backgroundColor theme.bright
-        , borderColor (rgb 107 106 101)
+        , borderColor (rgb 100 100 100)
         , borderRadius (px 5)
         , borderStyle solid
         , borderWidth (px 2)
-        , boxShadow5 (px 0) (px 1) (px 10) (px 3) (rgba 0 0 0 0.5)
-        , boxShadow6 inset (px 0) (px 1) (px 10) (px 3) (rgba 0 0 0 0.5)
+        , borderBottomColor (rgb 150 150 150)
+        , borderBottomStyle groove
+        , boxShadows
+            [ "inset 0 0px 10px 3px rgba(0, 0, 0, 0.5)"
+            , "0 -1px 4px 1px rgba(0, 0, 0, 0.5)"
+            ]
         , color textColor
         , fontFamilies [ qt "Roboto Mono", sansSerif.value ]
         , fontSize (Css.em 1)
         , fontWeight bold
         , letterSpacing (px 1.414)
         , margin (Css.em 1)
-        , padding2 (px 8) (px 11.31)
+        , padding3
+            (px 9)
+            (px 20)
+            (px 8)
         , textAlign center
         , textDecoration none
-        , textShadow4 zero zero (px 8) textColor
+        , textShadow4
+            zero
+            zero
+            (px 8)
+            textColor
         , textTransform uppercase
+        , boxSizing borderBox
+        , width (px 160)
         , active
-            [ Css.property "filter" "brightness(120%)"
-            , textShadow4 zero zero (px 3) textColor
-            , boxShadow6 inset (px 0) (px 1) (px 5) (px 3) (rgba 0 0 0 0.5)
+            [ boxShadows
+                [ "inset 0 1px 5px 3px rgba(0, 0, 0, 0.5)"
+                , "0 -1px 2px 1px rgba(0, 0, 0, 0.5)"
+                ]
+            , property "filter" "brightness(120%)"
+            , textShadow4
+                zero
+                zero
+                (px 3)
+                textColor
             ]
         , hover
-            [ Css.property "filter" "brightness(110%)"
+            [ property "filter" "brightness(110%)"
             ]
         , focus
             [ outline zero
             ]
         , transition
-            [ T.filter 100
-            , T.textShadow 100
+            [ T.border 100
             , T.boxShadow 100
+            , T.filter 100
+            , T.textShadow 100
             ]
         ]
 
@@ -293,3 +329,11 @@ route =
 
 empty =
     text ""
+
+
+boxShadows : List String -> Style
+boxShadows shadows =
+    property "box-shadow"
+        (shadows
+            |> String.join ","
+        )

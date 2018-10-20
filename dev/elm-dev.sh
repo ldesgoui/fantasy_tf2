@@ -10,4 +10,4 @@ caddy -conf dev/Caddyfile &
 
 entr sed -i '5i<meta name="viewport" content="width=device-width, initial-scale=1.0">' index.html <<< "index.html" &
 
-ls elm/* | entr elm make elm/Main.elm
+ls elm/* | entr elm make elm/Main.elm --debug

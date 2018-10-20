@@ -1,10 +1,14 @@
 module Data exposing (..)
 
+import Cache exposing (Cache)
 import Iso8601
 import Json.Decode exposing (..)
 import Json.Decode.Pipeline exposing (..)
 import Set
 import Time
+
+
+-- TOURNAMENT
 
 
 type alias Tournament =
@@ -21,6 +25,23 @@ type alias Tournament =
     }
 
 
+type alias TournamentPk =
+    String
+
+
+tournamentPk : Tournament -> TournamentPk
+tournamentPk { slug } =
+    slug
+
+
+type alias TournamentCache =
+    Cache TournamentPk Tournament
+
+
+
+-- TEAM
+
+
 type alias Team =
     { tournament : String
     , manager : String
@@ -32,6 +53,23 @@ type alias Team =
     , totalBudget : Int
     , remainingBudget : Int
     }
+
+
+type alias TeamPk =
+    ( String, String )
+
+
+teamPk : Team -> TeamPk
+teamPk { tournament, manager } =
+    ( tournament, manager )
+
+
+type alias TeamCache =
+    Cache TeamPk Team
+
+
+
+-- PLAYER
 
 
 type alias Player =
@@ -47,6 +85,23 @@ type alias Player =
     }
 
 
+type alias PlayerPk =
+    ( String, String )
+
+
+playerPk : Player -> PlayerPk
+playerPk { tournament, playerId } =
+    ( tournament, playerId )
+
+
+type alias PlayerCache =
+    Cache PlayerPk Player
+
+
+
+-- CONTRACT
+
+
 type alias Contract =
     { tournament : String
     , manager : String
@@ -58,6 +113,19 @@ type alias Contract =
     , score : Float
     , scorePerMap : Float
     }
+
+
+type alias ContractPk =
+    ( String, String, ( String, Int ) )
+
+
+contractPk : Contract -> ContractPk
+contractPk c =
+    ( c.tournament, c.manager, ( c.player, Time.posixToMillis c.startTime ) )
+
+
+type alias ContractCache =
+    Cache ContractPk Contract
 
 
 
@@ -133,80 +201,3 @@ iso8601 =
                     fail "Expected ISO-8601 datetime string"
         )
         string
-
-
-
--- PAGE JSON
-
-
-decodeHomeData =
-    list decodeTournament
-        |> map
-            (\tournaments ->
-                { tournaments = tournaments
-                }
-            )
-
-
-decodeTournamentData =
-    decodeTournament
-        |> map
-            (\tournament players teams ->
-                { tournament = tournament
-                , players = players
-                , teams = teams
-                }
-            )
-        |> required "player_view" (list decodePlayer)
-        |> required "team_view" (list decodeTeam)
-
-
-decodePlayerData =
-    decodeTournament
-        |> map
-            (\tournament player ->
-                { tournament = tournament
-                , player = player
-                }
-            )
-        |> required "player_view" (index 0 decodePlayer)
-
-
-decodeTeamData =
-    decodeTournament
-        |> map
-            (\tournament team contracts ->
-                { tournament = tournament
-                , team = team
-                , contracts = contracts
-                }
-            )
-        |> required "team_view" (index 0 decodeTeam)
-        |> required "contract_view" (list decodeContract)
-
-
-decodeManageData =
-    decodeTournament
-        |> map
-            (\tournament players team contracts ->
-                { tournament = tournament
-                , players = players
-                , team = team
-                , contracts = contracts
-                , selectedRoster =
-                    contracts
-                        |> List.filterMap
-                            (\c ->
-                                case c.endTime of
-                                    Nothing ->
-                                        Just c.player
-
-                                    _ ->
-                                        Nothing
-                            )
-                        |> Set.fromList
-                }
-            )
-        |> required "player_view" (list decodePlayer)
-        |> required "team_view" (index 0 decodeTeam)
-        |> required "contract_view" (list decodeContract)
