@@ -13,10 +13,12 @@ import Msg exposing (..)
 import Route exposing (Route)
 import Session exposing (Session(..))
 import Set
+import Task
 import Theme exposing (Theme)
 import Time
 import Ui
 import Url
+import Util exposing (..)
 
 
 -- MAIN
@@ -46,6 +48,7 @@ init : Flags -> Url.Url -> Nav.Key -> ModelAndCmd
 init flags url key =
     Model.initial key
         |> urlUpdate url
+        |> addCmd (Task.perform Tick Time.now)
 
 
 
@@ -54,7 +57,10 @@ init flags url key =
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
-    Time.every 1000 Tick
+    Sub.batch
+        [ Time.every 1000 Tick
+        , Time.every (10 * 60 * 1000) (always CachePurged)
+        ]
 
 
 
@@ -64,37 +70,66 @@ subscriptions model =
 update : Msg -> Model -> ModelAndCmd
 update msg model =
     case msg of
-        ThemeToggled ->
-            { model | theme = Theme.opposite model.theme }
+        NothingHappened ->
+            model
                 |> withNoCmd
 
+        -- THEME
+        ThemeToggled ->
+            { model
+                | theme = Theme.opposite model.theme
+            }
+                |> withNoCmd
+
+        -- ROUTE
         LinkClicked (Browser.Internal url) ->
-            model |> withCmd (Nav.pushUrl model.key (Url.toString url))
+            model
+                |> withCmd (Nav.pushUrl model.key (Url.toString url))
 
         LinkClicked (Browser.External href) ->
-            model |> withCmd (Nav.load href)
+            model
+                |> withCmd (Nav.load href)
 
         UrlChanged url ->
-            model |> urlUpdate url
+            model
+                |> urlUpdate url
 
+        -- SESSION
         Logout ->
-            -- TODO destroy localStorage.session
-            { model | session = Anonymous } |> withNoCmd
+            { model
+                | session = Anonymous
+            }
+                |> withCmd (saveSession Nothing)
 
-        TeamNameChanged newName ->
-            model
-                |> withNoCmd
-
-        PlayerToggled _ ->
-            model
-                |> withNoCmd
-
-        TeamSubmitted ->
-            -- TODO
-            model |> withNoCmd
-
-        Tick t ->
-            { model | now = t } |> withNoCmd
+        -- API/CACHE
+        Tick now ->
+            let
+                refresh =
+                    model.lastHttpFailure
+                        |> Maybe.map
+                            (\t ->
+                                Time.posixToMillis
+                                    (model.now
+                                        |> secondsAgo
+                                            (max 30 model.httpFailures)
+                                    )
+                                    > Time.posixToMillis t
+                            )
+                        |> Maybe.withDefault False
+            in
+            { model
+                | now = now
+                , lastHttpFailure =
+                    if refresh then
+                        Nothing
+                    else
+                        model.lastHttpFailure
+            }
+                |> (if refresh then
+                        Api.loadCaches
+                    else
+                        withNoCmd
+                   )
 
         LoadedTournaments (Ok tournaments) ->
             { model
@@ -108,6 +143,7 @@ update msg model =
                             )
                         |> Dict.fromList
                         |> flip Dict.union model.tournaments
+                , httpFailures = 0
             }
                 |> withNoCmd
 
@@ -123,6 +159,7 @@ update msg model =
                             )
                         |> Dict.fromList
                         |> flip Dict.union model.teams
+                , httpFailures = 0
             }
                 |> withNoCmd
 
@@ -138,6 +175,7 @@ update msg model =
                             )
                         |> Dict.fromList
                         |> flip Dict.union model.players
+                , httpFailures = 0
             }
                 |> withNoCmd
 
@@ -153,15 +191,68 @@ update msg model =
                             )
                         |> Dict.fromList
                         |> flip Dict.union model.contracts
+                , httpFailures = 0
             }
                 |> withNoCmd
 
-        _ ->
-            model |> withNoCmd
+        LoadedTournaments (Err err) ->
+            model
+                |> processHttpError err
+                |> withNoCmd
 
+        LoadedTeams (Err err) ->
+            model
+                |> processHttpError err
+                |> withNoCmd
 
+        LoadedPlayers (Err err) ->
+            model
+                |> processHttpError err
+                |> withNoCmd
 
--- ROUTER
+        LoadedContracts (Err err) ->
+            model
+                |> processHttpError err
+                |> withNoCmd
+
+        CachePurged ->
+            let
+                purgeOld =
+                    Cache.purgeOld
+                        (Time.millisToPosix <|
+                            Time.posixToMillis model.now
+                                - (1000 * 60 * 20)
+                        )
+            in
+            { model
+                | tournaments = purgeOld model.tournaments
+                , teams = purgeOld model.teams
+                , players = purgeOld model.players
+                , contracts = purgeOld model.contracts
+            }
+                |> Api.loadCaches
+
+        CacheDropped ->
+            { model
+                | tournaments = Dict.empty
+                , teams = Dict.empty
+                , players = Dict.empty
+                , contracts = Dict.empty
+            }
+                |> Api.loadCaches
+
+        -- MANAGE
+        TeamNameChanged newName ->
+            model
+                |> withNoCmd
+
+        PlayerToggled playerId ->
+            model
+                |> withNoCmd
+
+        TeamSubmitted ->
+            model
+                |> withNoCmd
 
 
 urlUpdate : Url.Url -> Model -> ModelAndCmd
@@ -174,6 +265,47 @@ urlUpdate url model =
         |> Api.loadCaches
 
 
+processHttpError : Http.Error -> Model -> Model
+processHttpError err model =
+    let
+        insert e m =
+            { m | errors = m.errors |> Set.insert e }
+
+        increment m =
+            { m
+                | lastHttpFailure = Just model.now
+                , httpFailures = m.httpFailures + 1
+            }
+    in
+    case err of
+        Http.BadUrl url ->
+            model
+                |> insert ("Developer error: invalid URL: " ++ url)
+
+        Http.Timeout ->
+            model
+                |> insert "Http request timed out"
+                |> increment
+
+        Http.NetworkError ->
+            model
+                |> insert "You have lost connection to the internet"
+                |> increment
+
+        Http.BadPayload s resp ->
+            model
+                |> insert ("Developer error: invalid response schema: " ++ s)
+
+        Http.BadStatus resp ->
+            model
+                |> insert ("Developer error: invalid status: " ++ resp.status.message)
+
+
+saveSession : Maybe String -> Cmd Msg
+saveSession token =
+    Cmd.none
+
+
 
 -- VIEW
 
@@ -183,11 +315,3 @@ view model =
     { title = "fantasy.tf2.gg"
     , body = Ui.document model
     }
-
-
-
--- UTIL
-
-
-flip f a b =
-    f b a

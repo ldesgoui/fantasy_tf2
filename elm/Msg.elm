@@ -4,25 +4,31 @@ import Browser
 import Data exposing (..)
 import Http as Http
 import Model exposing (..)
-import Set exposing (Set)
 import Time
 import Url
 
 
 type Msg
     = NothingHappened
+      -- THEME
     | ThemeToggled
-    | Tick Time.Posix
+      -- ROUTE
     | LinkClicked Browser.UrlRequest
     | UrlChanged Url.Url
+      -- SESSION
     | Logout
-    | TeamNameChanged String
-    | PlayerToggled String
-    | TeamSubmitted
+      -- API/CACHE
+    | Tick Time.Posix
     | LoadedTournaments (Result Http.Error (List Tournament))
     | LoadedTeams (Result Http.Error (List Team))
     | LoadedPlayers (Result Http.Error (List Player))
     | LoadedContracts (Result Http.Error (List Contract))
+    | CachePurged
+    | CacheDropped
+      -- MANAGE
+    | TeamNameChanged String
+    | PlayerToggled String
+    | TeamSubmitted
 
 
 type alias ModelAndCmd =

@@ -10,6 +10,12 @@ import Msg exposing (..)
 import Route exposing (Route)
 import Session exposing (Session)
 import Time
+import Util exposing (..)
+
+
+apiBase : String
+apiBase =
+    "http://10.233.1.2/api/"
 
 
 loadCaches : Model -> ModelAndCmd
@@ -32,7 +38,7 @@ loadCaches model =
         Just (Route.Player pk) ->
             model
                 |> withCmd (loadTournamentByRelation model pk)
-                |> addCmd (loadPlayer model pk)
+                |> addCmd (loadPlayersByTournamentRelation model pk)
 
         Just (Route.Team pk) ->
             model
@@ -171,16 +177,6 @@ loadContractsByTeam model pk =
 -- UTIL
 
 
-apiBase : String
-apiBase =
-    "http://10.233.1.2/api/"
-
-
 get path =
     Http.get (apiBase ++ path)
-
-
-minutesAgo minutes time =
-    Time.millisToPosix <|
-        Time.posixToMillis time
-            - (1000 * 60 * minutes)
+        |> Http.withTimeout (1000 * 30)

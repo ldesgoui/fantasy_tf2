@@ -19,29 +19,55 @@ type alias ManageModel =
 
 
 type alias Model =
-    { key : Nav.Key
-    , now : Time.Posix
-    , session : Session
+    { errors : Set String
+
+    -- THEME
     , theme : Theme
+
+    -- ROUTE
+    , key : Nav.Key
     , route : Maybe Route
-    , manageModel : Maybe ManageModel
+
+    -- SESSION
+    , session : Session
+
+    -- API/CACHE
+    , now : Time.Posix
+    , httpFailures : Int
+    , lastHttpFailure : Maybe Time.Posix
     , tournaments : TournamentCache
     , players : PlayerCache
     , teams : TeamCache
     , contracts : ContractCache
+
+    -- MANAGE
+    , manageModel : Maybe ManageModel
     }
 
 
 initial : Nav.Key -> Model
 initial key =
-    { key = key
-    , now = Time.millisToPosix 0
-    , session = Session.Anonymous
+    { errors = Set.empty
+
+    -- THEME
     , theme = Theme.spyTechRed
+
+    -- ROUTE
+    , key = key
     , route = Nothing
-    , manageModel = Nothing
+
+    -- SESSION
+    , session = Session.Manager { managerId = "1" }
+
+    -- API/CACHE
+    , now = Time.millisToPosix 0
+    , httpFailures = 0
+    , lastHttpFailure = Nothing
     , tournaments = Dict.empty
     , players = Dict.empty
     , teams = Dict.empty
     , contracts = Dict.empty
+
+    -- MANAGE
+    , manageModel = Nothing
     }

@@ -14,7 +14,21 @@ type alias Cache key value =
     Dict key (Entry value)
 
 
-freshValues : Time.Posix -> Cache key value -> List value
+get : comparable -> Cache comparable value -> Maybe value
+get key cache =
+    cache
+        |> Dict.get key
+        |> Maybe.andThen .value
+
+
+values : Cache comparable value -> List value
+values cache =
+    cache
+        |> Dict.values
+        |> List.filterMap .value
+
+
+freshValues : Time.Posix -> Cache comparable value -> List value
 freshValues maxAge cache =
     cache
         |> Dict.values
@@ -37,6 +51,15 @@ isFresh maxAge key cache =
                     && (Time.posixToMillis lastHit > Time.posixToMillis maxAge)
             )
         |> Maybe.withDefault False
+
+
+purgeOld : Time.Posix -> Cache comparable val -> Cache comparable val
+purgeOld maxAge cache =
+    cache
+        |> Dict.filter
+            (\_ { lastHit } ->
+                Time.posixToMillis lastHit > Time.posixToMillis maxAge
+            )
 
 
 entry : Time.Posix -> value -> Entry value

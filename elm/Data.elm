@@ -25,6 +25,21 @@ type alias Tournament =
     }
 
 
+decodeTournament : Decoder Tournament
+decodeTournament =
+    succeed Tournament
+        |> required "slug" string
+        |> required "name" string
+        |> required "start_time" iso8601
+        |> required "end_time" (maybe iso8601)
+        |> required "start_budget" int
+        |> required "transactions" int
+        |> required "real_team_count" int
+        |> required "player_count" int
+        |> required "team_count" int
+        |> required "contract_count" int
+
+
 type alias TournamentPk =
     String
 
@@ -55,6 +70,20 @@ type alias Team =
     }
 
 
+decodeTeam : Decoder Team
+decodeTeam =
+    succeed Team
+        |> required "tournament" string
+        |> required "manager" string
+        |> required "name" string
+        |> required "transactions" int
+        |> required "rank" int
+        |> required "score" float
+        |> required "start_budget" int
+        |> required "total_budget" int
+        |> required "remaining_budget" int
+
+
 type alias TeamPk =
     ( String, String )
 
@@ -78,11 +107,25 @@ type alias Player =
     , realTeam : String
     , name : String
     , price : Int
-    , classRank : Int
     , rank : Int
+    , classRank : Int
     , score : Float
     , scorePerMap : Float
     }
+
+
+decodePlayer : Decoder Player
+decodePlayer =
+    succeed Player
+        |> required "tournament" string
+        |> required "player_id" string
+        |> required "real_team" string
+        |> required "name" string
+        |> required "price" int
+        |> required "rank" int
+        |> required "class_rank" int
+        |> required "score" float
+        |> required "score_per_map" float
 
 
 type alias PlayerPk =
@@ -115,6 +158,20 @@ type alias Contract =
     }
 
 
+decodeContract : Decoder Contract
+decodeContract =
+    succeed Contract
+        |> required "tournament" string
+        |> required "manager" string
+        |> required "player" string
+        |> required "purchase_price" int
+        |> required "sale_price" (maybe int)
+        |> required "start_time" iso8601
+        |> required "end_time" (maybe iso8601)
+        |> required "score" float
+        |> required "score_per_map" float
+
+
 type alias ContractPk =
     ( String, String, ( String, Int ) )
 
@@ -130,63 +187,6 @@ type alias ContractCache =
 
 
 -- JSON
-
-
-decodeTournament : Decoder Tournament
-decodeTournament =
-    succeed Tournament
-        |> required "slug" string
-        |> required "name" string
-        |> required "start_time" iso8601
-        |> required "end_time" (maybe iso8601)
-        |> required "start_budget" int
-        |> required "transactions" int
-        |> required "real_team_count" int
-        |> required "player_count" int
-        |> required "team_count" int
-        |> required "contract_count" int
-
-
-decodeTeam : Decoder Team
-decodeTeam =
-    succeed Team
-        |> required "tournament" string
-        |> required "manager" string
-        |> required "name" string
-        |> required "transactions" int
-        |> required "rank" int
-        |> required "score" float
-        |> required "start_budget" int
-        |> required "total_budget" int
-        |> required "remaining_budget" int
-
-
-decodePlayer : Decoder Player
-decodePlayer =
-    succeed Player
-        |> required "tournament" string
-        |> required "player_id" string
-        |> required "real_team" string
-        |> required "name" string
-        |> required "price" int
-        |> required "rank" int
-        |> required "class_rank" int
-        |> required "score" float
-        |> required "score_per_map" float
-
-
-decodeContract : Decoder Contract
-decodeContract =
-    succeed Contract
-        |> required "tournament" string
-        |> required "manager" string
-        |> required "player" string
-        |> required "purchase_price" int
-        |> required "sale_price" (maybe int)
-        |> required "start_time" iso8601
-        |> required "end_time" (maybe iso8601)
-        |> required "score" float
-        |> required "score_per_map" float
 
 
 iso8601 : Decoder Time.Posix
