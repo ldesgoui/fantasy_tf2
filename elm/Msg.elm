@@ -26,9 +26,10 @@ type Msg
     | CachePurged
     | CacheDropped
       -- MANAGE
-    | TeamNameChanged String
-    | PlayerToggled String
-    | TeamSubmitted
+    | TeamNameChanged TournamentPk String
+    | PlayerToggled TournamentPk String
+    | TeamSubmitted TournamentPk
+    | ManageReset TournamentPk
 
 
 type alias ModelAndCmd =

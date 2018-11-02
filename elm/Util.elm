@@ -19,3 +19,11 @@ secondsAgo seconds =
 
 flip f a b =
     f b a
+
+
+divBy b a =
+    a / b
+
+
+addTo b a =
+    a + b

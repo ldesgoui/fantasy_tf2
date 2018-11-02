@@ -41,7 +41,7 @@ type alias Model =
     , contracts : ContractCache
 
     -- MANAGE
-    , manageModel : Maybe ManageModel
+    , manageModel : Dict TournamentPk ManageModel
     }
 
 
@@ -50,7 +50,7 @@ initial key =
     { errors = Set.empty
 
     -- THEME
-    , theme = Theme.spyTechRed
+    , theme = Theme.spyTechBlu
 
     -- ROUTE
     , key = key
@@ -69,5 +69,31 @@ initial key =
     , contracts = Dict.empty
 
     -- MANAGE
-    , manageModel = Nothing
+    , manageModel = Dict.empty
     }
+
+
+manage : TournamentPk -> Model -> Maybe ManageModel
+manage pk model =
+    case model.session of
+        Session.Anonymous ->
+            Nothing
+
+        Session.Manager { managerId } ->
+            Just
+                { tournament = pk
+                , name =
+                    Cache.get ( pk, managerId ) model.teams
+                        |> Maybe.map .name
+                        |> Maybe.withDefault ""
+                , roster =
+                    Cache.values model.contracts
+                        |> List.filter
+                            (\c ->
+                                (c.tournament == pk)
+                                    && (c.manager == managerId)
+                                    && (c.endTime == Nothing)
+                            )
+                        |> List.map .player
+                        |> Set.fromList
+                }

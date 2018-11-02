@@ -6,9 +6,10 @@ import Css exposing (..)
 import Css.Global as Global exposing (global)
 import Css.Transitions as T exposing (transition)
 import Data exposing (..)
+import Dict exposing (Dict)
 import Html
 import Html.Styled exposing (..)
-import Html.Styled.Attributes as Attr exposing (css, href, rel, src)
+import Html.Styled.Attributes as Attr exposing (..)
 import Html.Styled.Events as Ev exposing (..)
 import Html.Styled.Lazy exposing (..)
 import Model exposing (Model)
@@ -16,8 +17,11 @@ import Msg exposing (Msg)
 import Route exposing (Route)
 import Session exposing (Session)
 import Set exposing (Set)
+import Svg.Styled as S exposing (Svg)
+import Svg.Styled.Attributes as SA
 import Theme exposing (Theme)
 import Time
+import Util exposing (..)
 
 
 document : Model -> List (Html.Html Msg)
@@ -29,7 +33,8 @@ document model =
         []
     , global
         [ Global.body
-            [ backgroundImage (url model.theme.background)
+            [ backgroundImage (url model.theme.backgroundImage)
+            , backgroundColor model.theme.backgroundColor
             , backgroundSize (px 512)
             , margin zero
             , padding2 (px 32) (px 16)
@@ -43,7 +48,6 @@ document model =
         [ css
             [ displayFlex
             , flexDirection column
-            , whiteSpace Css.pre
             , boxSizing borderBox
             ]
         ]
@@ -60,7 +64,7 @@ navigation model =
     nav
         [ css
             [ displayFlex
-            , flexWrap wrap
+            , flexWrap Css.wrap
             , justifyContent center
             ]
         ]
@@ -135,7 +139,12 @@ page model =
             playerPage (playerData model pk)
 
         Just (Route.Manage pk) ->
-            managePage (manageData model pk)
+            case model.session of
+                Session.Anonymous ->
+                    [ text "Please log in" ]
+
+                Session.Manager m ->
+                    managePage (manageData model pk m)
 
         Just Route.Admin ->
             []
@@ -167,13 +176,15 @@ homeData model =
     , theme = model.theme
     , tournaments = tournaments
     , points =
-        [ ( 36, 48.6, get "i63" )
+        -- pointData()
+        [ ( 36, 48.6, get "insomnia-" )
         ]
     , zones =
-        [ ( 33, 53, get "i63" )
-        , ( 40, 25, get "i63" )
-        , ( 40, 80, get "i63" )
-        , ( 76, 85, get "i63" )
+        -- zoneData()
+        [ ( 33, 53, get "etf2l-" )
+        , ( 40, 25, get "esea-" )
+        , ( 40, 80, get "asiafortress-" )
+        , ( 76, 85, get "ozfortress-" )
         ]
     }
 
@@ -186,24 +197,12 @@ homePage data =
             , maxWidth (vw 100)
             , alignSelf center
             , display block
-            , property "transform" "perspective(50vw) rotateX(-5deg)"
-            , property "transform-origin" "top"
+            , Css.property "transform" "perspective(50vw) rotateX(-5deg)"
+            , Css.property "transform-origin" "top"
             , boxShadows [ "0 0px 30px 20px rgba(0, 0, 0, 0.5)" ]
             ]
         ]
-        (img
-            -- TODO svg
-            [ src "/assets/map_world.png"
-            , css [ width (pct 100), display block ]
-            ]
-            []
-            :: (data.zones
-                    |> List.map mapZone
-               )
-            ++ (data.points
-                    |> List.map mapPoint
-               )
-        )
+        (worldMap data)
     , div
         [ css
             [ marginTop (px 64)
@@ -232,85 +231,151 @@ homePage data =
     ]
 
 
-mapZone : ( Float, Float, Maybe Tournament ) -> Html Msg
-mapZone ( top_, left_, mTournament ) =
+worldMap data =
+    [ img
+        [ src "/assets/map_world.png"
+        , css [ Css.width (pct 100), display block ]
+        ]
+        []
+    , S.svg
+        [ SA.css
+            [ position absolute
+            , top zero
+            ]
+        , SA.width "100%"
+        , SA.height "100%"
+        ]
+        (S.defs
+            []
+            [ S.filter
+                [ SA.id "point"
+                , SA.width "500%"
+                , SA.height "500%"
+                , SA.x "-200%"
+                , SA.y "-200%"
+                ]
+                [ S.node "feDropShadow"
+                    [ SA.result "wide"
+                    , SA.in_ "SourceGraphic"
+                    , SA.floodColor "#ff0"
+                    , SA.stdDeviation "10 10"
+                    , SA.dx "0"
+                    , SA.dy "0"
+                    ]
+                    []
+                , S.node "feDropShadow"
+                    [ SA.result "narrow"
+                    , SA.in_ "SourceGraphic"
+                    , SA.floodColor "#ff0"
+                    , SA.stdDeviation "4 4"
+                    , SA.dx "0"
+                    , SA.dy "0"
+                    ]
+                    []
+                , S.feMerge
+                    []
+                    [ S.feMergeNode [ SA.in_ "wide" ] []
+                    , S.feMergeNode [ SA.in_ "wide" ] []
+                    , S.feMergeNode [ SA.in_ "narrow" ] []
+                    ]
+                ]
+            ]
+            :: List.map (mapZone data.theme) data.zones
+            ++ List.map mapPoint data.points
+        )
+    ]
+
+
+mapZone : Theme -> ( Float, Float, Maybe Tournament ) -> Svg Msg
+mapZone theme ( top_, left_, mTournament ) =
     let
         size =
             mTournament
                 |> Maybe.map .teamCount
                 |> Maybe.withDefault 0
-                |> (\n -> (toFloat n / 10000) + 0.1)
-                |> clamp 0.1 0.2
+                |> toFloat
+                |> clamp 0 1000
+                |> divBy 40
+                |> sqrt
+                |> addTo 5
+
+        pct n =
+            String.fromFloat n ++ "%"
     in
-    a
-        [ case mTournament of
+    S.a
+        (case mTournament of
             Just tournament ->
-                route <| Route.Tournament <| tournamentPk tournament
+                [ SA.xlinkHref <|
+                    Route.toString <|
+                        Route.Tournament <|
+                            tournamentPk tournament
+                ]
 
             Nothing ->
-                href "#"
-        , css
-            [ position absolute
-            , top (pct top_)
-            , left (pct left_)
-            , transform <| translate2 (pct -50) (pct -50)
-            , borderRadius (pct 50)
-            , property "width" <| "calc((100vw - 32px) * " ++ String.fromFloat size ++ ")"
-            , property "height" <| "calc((100vw - 32px) * " ++ String.fromFloat size ++ ")"
-            , maxWidth (px <| 1056 * size)
-            , maxHeight (px <| 1056 * size)
-            , backgroundColor (rgba 255 0 0 0.3)
-            , hover [ backgroundColor (rgba 255 25 25 0.6) ]
-            , active [ backgroundColor (rgba 255 50 50 0.9) ]
-            , T.transition [ T.backgroundColor 100 ]
+                []
+        )
+        [ S.circle
+            [ SA.cx <| pct left_
+            , SA.cy <| pct top_
+            , SA.r <| pct size
+            , SA.css
+                [ fill theme.mapZone
+                , hover [ fill theme.mapZoneHover ]
+                , active [ fill theme.mapZoneActive ]
+                , Css.property "transition" "fill 100ms"
+                ]
             ]
+            []
         ]
-        []
 
 
-mapPoint : ( Float, Float, Maybe Tournament ) -> Html Msg
+mapPoint : ( Float, Float, Maybe Tournament ) -> Svg Msg
 mapPoint ( top_, left_, mTournament ) =
     let
         size =
             mTournament
                 |> Maybe.map .teamCount
                 |> Maybe.withDefault 0
-                |> (\n -> (toFloat n / 5000) + 0.1)
-                |> clamp 0.02 0.03
+                |> toFloat
+                |> clamp 0 500
+                |> divBy 100
+                |> sqrt
+                |> addTo 2
+
+        pct n =
+            String.fromFloat n ++ "%"
     in
-    a
-        [ case mTournament of
+    S.a
+        (case mTournament of
             Just tournament ->
-                route <| Route.Tournament <| tournamentPk tournament
+                [ SA.xlinkHref <|
+                    Route.toString <|
+                        Route.Tournament <|
+                            tournamentPk tournament
+                ]
 
             Nothing ->
-                href "#"
-        , css
-            [ position absolute
-            , top (pct top_)
-            , left (pct left_)
-            , transform <| translate2 (pct -50) (pct -50)
-            , borderRadius (pct 50)
-            , property "width" <| "calc((100vw - 32px) * " ++ String.fromFloat size ++ ")"
-            , property "height" <| "calc((100vw - 32px) * " ++ String.fromFloat size ++ ")"
-            , maxWidth (px <| 1056 * size)
-            , maxHeight (px <| 1056 * size)
-            , hover [ backgroundColor (rgba 255 255 25 0.6) ]
-            , active [ backgroundColor (rgba 255 255 50 0.9) ]
-            , T.transition [ T.backgroundColor 100 ]
+                []
+        )
+        [ S.circle
+            [ SA.cx <| pct left_
+            , SA.cy <| pct top_
+            , SA.r <| pct (size / 5)
+            , SA.filter "url(#point)"
+            , SA.css
+                [ fill (rgba 255 255 0 1)
+                ]
             ]
-        ]
-        [ div
-            [ css
-                [ backgroundColor (rgba 255 255 0 1.0)
-                , boxShadow5 (px 0) (px 0) (px 10) (px 5) (rgba 255 255 0 0.5)
-                , width (px 5)
-                , height (px 5)
-                , borderRadius (pct 50)
-                , top (pct 50)
-                , left (pct 50)
-                , position absolute
-                , transform <| translate2 (pct -50) (pct -50)
+            []
+        , S.circle
+            [ SA.cx <| pct left_
+            , SA.cy <| pct top_
+            , SA.r <| pct size
+            , SA.css
+                [ fill transparent
+                , hover [ fill (rgba 255 255 25 0.3) ]
+                , active [ fill (rgba 255 255 50 0.6) ]
+                , Css.property "transition" "fill 100ms"
                 ]
             ]
             []
@@ -532,12 +597,90 @@ teammatesItem player =
 -- MANAGE
 
 
-manageData model pk =
-    {}
+manageData model pk manager =
+    let
+        team =
+            Cache.get ( pk, manager.managerId ) model.teams
+
+        contracts =
+            Cache.values model.contracts
+                |> List.filter
+                    (\c -> c.tournament == pk && c.manager == manager.managerId)
+
+        defaultManage =
+            { tournament = pk
+            , name =
+                team
+                    |> Maybe.map .name
+                    |> Maybe.withDefault ""
+            , roster =
+                contracts
+                    |> List.filter (\c -> c.endTime == Nothing)
+                    |> List.map .player
+                    |> Set.fromList
+            }
+
+        manage =
+            model.manageModel
+                |> Dict.get pk
+                |> Maybe.withDefault defaultManage
+
+        { scouts, soldiers, demomen, medics } =
+            Cache.values model.players
+                |> List.filter (\p -> p.tournament == pk)
+                |> List.foldl
+                    (\p a ->
+                        case p.mainClass of
+                            "scout" ->
+                                { a | scouts = p :: a.scouts }
+
+                            "soldier" ->
+                                { a | soldiers = p :: a.soldiers }
+
+                            "demoman" ->
+                                { a | demomen = p :: a.demomen }
+
+                            "medic" ->
+                                { a | medics = p :: a.medics }
+
+                            _ ->
+                                a
+                    )
+                    { scouts = [], soldiers = [], demomen = [], medics = [] }
+    in
+    { theme = model.theme
+    , pk = pk
+    , tournament = Cache.get pk model.tournaments
+    , scouts = scouts
+    , soldiers = soldiers
+    , demomen = demomen
+    , medics = medics
+    , team = team
+    , contracts = contracts
+    , manage = manage
+    }
 
 
 managePage data =
-    []
+    let
+        selectablePlayer player =
+            li
+                [ css [ cursor pointer ]
+                , onClick (Msg.PlayerToggled data.pk player.playerId)
+                ]
+                [ text player.name
+                , if Set.member player.playerId data.manage.roster then
+                    text " (selected)"
+                  else
+                    text ""
+                ]
+    in
+    [ input [ onInput (Msg.TeamNameChanged data.pk), value data.manage.name ] []
+    , ul [] (List.map selectablePlayer data.scouts)
+    , ul [] (List.map selectablePlayer data.soldiers)
+    , ul [] (List.map selectablePlayer data.demomen)
+    , ul [] (List.map selectablePlayer data.medics)
+    ]
 
 
 
@@ -560,7 +703,7 @@ navigationItemStyle theme =
             rgb 232 199 191
     in
     batch
-        [ backgroundColor theme.bright
+        [ backgroundColor theme.button
         , borderColor (rgb 100 100 100)
         , borderRadius (px 5)
         , borderStyle solid
@@ -590,13 +733,13 @@ navigationItemStyle theme =
             (px 8)
             textColor
         , textTransform uppercase
-        , width (px 160)
+        , Css.width (px 160)
         , active
             [ boxShadows
                 [ "inset 0 1px 5px 3px rgba(0, 0, 0, 0.5)"
                 , "0 -1px 2px 1px rgba(0, 0, 0, 0.5)"
                 ]
-            , property "filter" "brightness(120%)"
+            , Css.property "filter" "brightness(120%)"
             , textShadow4
                 zero
                 zero
@@ -604,7 +747,7 @@ navigationItemStyle theme =
                 textColor
             ]
         , hover
-            [ property "filter" "brightness(110%)"
+            [ Css.property "filter" "brightness(110%)"
             ]
         , focus
             [ outline zero
@@ -632,7 +775,7 @@ empty =
 
 boxShadows : List String -> Style
 boxShadows shadows =
-    property "box-shadow"
+    Css.property "box-shadow"
         (shadows
             |> String.join ","
         )

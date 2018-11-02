@@ -242,17 +242,57 @@ update msg model =
                 |> Api.loadCaches
 
         -- MANAGE
-        TeamNameChanged newName ->
+        TeamNameChanged pk newName ->
+            model
+                |> updateManage pk
+                    (\manage ->
+                        { manage | name = newName }
+                    )
+                |> withNoCmd
+
+        PlayerToggled pk playerId ->
+            model
+                |> updateManage pk
+                    (\manage ->
+                        { manage
+                            | roster =
+                                if Set.member playerId manage.roster then
+                                    Set.remove playerId manage.roster
+                                else
+                                    Set.insert playerId manage.roster
+                        }
+                    )
+                |> withNoCmd
+
+        TeamSubmitted pk ->
             model
                 |> withNoCmd
 
-        PlayerToggled playerId ->
-            model
+        ManageReset pk ->
+            { model
+                | manageModel =
+                    model.manageModel
+                        |> Dict.remove pk
+            }
                 |> withNoCmd
 
-        TeamSubmitted ->
-            model
-                |> withNoCmd
+
+updateManage pk f model =
+    { model
+        | manageModel =
+            model.manageModel
+                |> Dict.update pk
+                    (\m ->
+                        (case m of
+                            Nothing ->
+                                Model.manage pk model
+
+                            just ->
+                                just
+                        )
+                            |> Maybe.map f
+                    )
+    }
 
 
 urlUpdate : Url.Url -> Model -> ModelAndCmd

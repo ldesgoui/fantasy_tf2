@@ -89,8 +89,7 @@ loadTournament model pk =
     else
         get "tournament_view"
             |> Http.withQueryParam "slug" ("eq." ++ pk)
-            |> Http.withHeader "Accept" "application/vnd.pgrst.object+json"
-            |> Http.withExpectJson (JD.map List.singleton decodeTournament)
+            |> Http.withExpectJson (JD.list decodeTournament)
             |> Http.send LoadedTournaments
 
 
@@ -124,8 +123,7 @@ loadTeam model pk =
         get "team_view"
             |> Http.withQueryParam "tournament" ("eq." ++ Tuple.first pk)
             |> Http.withQueryParam "manager" ("eq." ++ Tuple.second pk)
-            |> Http.withHeader "Accept" "application/vnd.pgrst.object+json"
-            |> Http.withExpectJson (JD.map List.singleton decodeTeam)
+            |> Http.withExpectJson (JD.list decodeTeam)
             |> Http.send LoadedTeams
 
 
@@ -158,8 +156,7 @@ loadPlayer model pk =
         get "player_view"
             |> Http.withQueryParam "tournament" ("eq." ++ Tuple.first pk)
             |> Http.withQueryParam "player_id" ("eq." ++ Tuple.second pk)
-            |> Http.withHeader "Accept" "application/vnd.pgrst.object+json"
-            |> Http.withExpectJson (JD.map List.singleton decodePlayer)
+            |> Http.withExpectJson (JD.list decodePlayer)
             |> Http.send LoadedPlayers
 
 

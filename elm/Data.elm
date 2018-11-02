@@ -106,6 +106,7 @@ type alias Player =
     , playerId : String
     , realTeam : String
     , name : String
+    , mainClass : String
     , price : Int
     , rank : Int
     , classRank : Int
@@ -121,6 +122,7 @@ decodePlayer =
         |> required "player_id" string
         |> required "real_team" string
         |> required "name" string
+        |> required "main_class" string
         |> required "price" int
         |> required "rank" int
         |> required "class_rank" int
