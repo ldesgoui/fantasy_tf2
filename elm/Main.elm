@@ -16,9 +16,9 @@ import Set
 import Task
 import Theme exposing (Theme)
 import Time
-import Ui
 import Url
 import Util exposing (..)
+import View
 
 
 -- MAIN
@@ -106,15 +106,7 @@ update msg model =
             let
                 refresh =
                     model.lastHttpFailure
-                        |> Maybe.map
-                            (\t ->
-                                Time.posixToMillis
-                                    (model.now
-                                        |> secondsAgo
-                                            (max 30 model.httpFailures)
-                                    )
-                                    > Time.posixToMillis t
-                            )
+                        |> Maybe.map (isBefore (model.now |> secondsAgo 10))
                         |> Maybe.withDefault False
             in
             { model
@@ -353,5 +345,5 @@ saveSession token =
 view : Model -> Browser.Document Msg
 view model =
     { title = "fantasy.tf2.gg"
-    , body = Ui.document model
+    , body = View.document model
     }

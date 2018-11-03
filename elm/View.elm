@@ -1,4 +1,4 @@
-module Ui exposing (..)
+module View exposing (..)
 
 import Browser
 import Cache exposing (Cache)
@@ -12,6 +12,7 @@ import Html.Styled exposing (..)
 import Html.Styled.Attributes as Attr exposing (..)
 import Html.Styled.Events as Ev exposing (..)
 import Html.Styled.Lazy exposing (..)
+import List.Extra as List
 import Model exposing (Model)
 import Msg exposing (Msg)
 import Route exposing (Route)
@@ -168,7 +169,10 @@ homeData model =
                 |> List.filter
                     (\t ->
                         String.startsWith name t.slug
-                     -- && (t.endTime == Nothing)
+                            && (t.endTime
+                                    |> Maybe.map (isAfter model.now)
+                                    |> Maybe.withDefault True
+                               )
                     )
                 |> List.head
     in
@@ -411,6 +415,37 @@ tournamentData model pk =
 
 
 tournamentPage data =
+    let
+        playerLeaderboardItem player =
+            li []
+                [ a
+                    [ route <| Route.Player ( player.tournament, player.playerId )
+                    ]
+                    [ text "#"
+                    , text (String.fromInt player.rank)
+                    , text " - "
+                    , text player.name
+                    , text " ("
+                    , text (String.fromFloat player.score)
+                    , text ")"
+                    ]
+                ]
+
+        teamLeaderboardItem team =
+            li []
+                [ a
+                    [ route <| Route.Team ( team.tournament, team.manager )
+                    ]
+                    [ text "#"
+                    , text (String.fromInt team.rank)
+                    , text " - "
+                    , text team.name
+                    , text " ("
+                    , text (String.fromFloat team.score)
+                    , text ")"
+                    ]
+                ]
+    in
     case data.tournament of
         Nothing ->
             [ text "Loading" ]
@@ -430,38 +465,6 @@ tournamentPage data =
                     |> List.map teamLeaderboardItem
                 )
             ]
-
-
-playerLeaderboardItem player =
-    li []
-        [ a
-            [ route <| Route.Player ( player.tournament, player.playerId )
-            ]
-            [ text "#"
-            , text (String.fromInt player.rank)
-            , text " - "
-            , text player.name
-            , text " ("
-            , text (String.fromFloat player.score)
-            , text ")"
-            ]
-        ]
-
-
-teamLeaderboardItem team =
-    li []
-        [ a
-            [ route <| Route.Team ( team.tournament, team.manager )
-            ]
-            [ text "#"
-            , text (String.fromInt team.rank)
-            , text " - "
-            , text team.name
-            , text " ("
-            , text (String.fromFloat team.score)
-            , text ")"
-            ]
-        ]
 
 
 
@@ -494,6 +497,33 @@ teamData model pk =
 
 
 teamPage data =
+    let
+        rosterItem ( contract, mPlayer ) =
+            case mPlayer of
+                Just player ->
+                    li []
+                        [ a
+                            [ route <| Route.Player ( contract.tournament, contract.player )
+                            ]
+                            [ text player.name ]
+                        ]
+
+                _ ->
+                    li [] [ text "Loading" ]
+
+        contractHistoryItem ( contract, mPlayer ) =
+            case mPlayer of
+                Just player ->
+                    li []
+                        [ a
+                            [ route <| Route.Player ( contract.tournament, contract.player )
+                            ]
+                            [ text player.name ]
+                        ]
+
+                _ ->
+                    li [] [ text "Loading" ]
+    in
     case data.team of
         Nothing ->
             [ text "Loading" ]
@@ -513,34 +543,6 @@ teamPage data =
                     |> List.map contractHistoryItem
                 )
             ]
-
-
-rosterItem ( contract, mPlayer ) =
-    case mPlayer of
-        Just player ->
-            li []
-                [ a
-                    [ route <| Route.Player ( contract.tournament, contract.player )
-                    ]
-                    [ text player.name ]
-                ]
-
-        _ ->
-            li [] [ text "Loading" ]
-
-
-contractHistoryItem ( contract, mPlayer ) =
-    case mPlayer of
-        Just player ->
-            li []
-                [ a
-                    [ route <| Route.Player ( contract.tournament, contract.player )
-                    ]
-                    [ text player.name ]
-                ]
-
-        _ ->
-            li [] [ text "Loading" ]
 
 
 
@@ -567,6 +569,15 @@ playerData model pk =
 
 
 playerPage data =
+    let
+        teammatesItem player =
+            li []
+                [ a
+                    [ route <| Route.Player <| playerPk player
+                    ]
+                    [ text player.name ]
+                ]
+    in
     case data.player of
         Nothing ->
             [ text "Loading" ]
@@ -582,15 +593,6 @@ playerPage data =
                     |> List.map teammatesItem
                 )
             ]
-
-
-teammatesItem player =
-    li []
-        [ a
-            [ route <| Route.Player <| playerPk player
-            ]
-            [ text player.name ]
-        ]
 
 
 
@@ -625,9 +627,12 @@ manageData model pk manager =
                 |> Dict.get pk
                 |> Maybe.withDefault defaultManage
 
-        { scouts, soldiers, demomen, medics } =
+        players =
             Cache.values model.players
                 |> List.filter (\p -> p.tournament == pk)
+
+        { scouts, soldiers, demomen, medics } =
+            players
                 |> List.foldl
                     (\p a ->
                         case p.mainClass of
@@ -647,17 +652,115 @@ manageData model pk manager =
                                 a
                     )
                     { scouts = [], soldiers = [], demomen = [], medics = [] }
+
+        tournament =
+            Cache.get pk model.tournaments
+
+        isTournamentOver =
+            tournament
+                |> Maybe.map .endTime
+                |> Maybe.withDefault Nothing
+                |> Maybe.map (isBefore model.now)
+                |> Maybe.withDefault False
+
+        fired =
+            Set.diff defaultManage.roster manage.roster
+
+        hired =
+            Set.diff manage.roster defaultManage.roster
+
+        newTransactions =
+            team
+                |> Maybe.map .transactions
+                |> Maybe.withDefault 0
+                |> addTo (List.length <| Set.toList fired)
+
+        ranOutOfTransactions =
+            newTransactions
+                > (tournament
+                    |> Maybe.map .transactions
+                    |> Maybe.withDefault 0
+                  )
+
+        saleSum =
+            players
+                |> List.filter (.playerId >> flip Set.member fired)
+                |> List.map .price
+                |> List.sum
+
+        purchaseSum =
+            players
+                |> List.filter (.playerId >> flip Set.member hired)
+                |> List.map .price
+                |> List.sum
+
+        newRemainingBudget =
+            team
+                |> Maybe.map .remainingBudget
+                |> Maybe.withDefault 0
+                |> addTo saleSum
+                |> addTo -purchaseSum
+
+        isOverspending =
+            newRemainingBudget < 0
+
+        scoutsAmount =
+            scouts |> List.filter (.playerId >> flip Set.member manage.roster) |> List.length
+
+        soldiersAmount =
+            soldiers |> List.filter (.playerId >> flip Set.member manage.roster) |> List.length
+
+        demomenAmount =
+            demomen |> List.filter (.playerId >> flip Set.member manage.roster) |> List.length
+
+        medicsAmount =
+            medics |> List.filter (.playerId >> flip Set.member manage.roster) |> List.length
+
+        isInvalidComposition =
+            (scoutsAmount /= 2)
+                || (soldiersAmount /= 2)
+                || (demomenAmount /= 1)
+                || (medicsAmount /= 1)
+
+        realTeamOverlaps =
+            players
+                |> List.filter (.playerId >> flip Set.member manage.roster)
+                |> List.gatherEqualsBy .realTeam
+                |> List.map (\( a, b ) -> ( a.realTeam, 1 + List.length b ))
+
+        isBreakingOverlapRule =
+            realTeamOverlaps
+                |> List.any (\( a, b ) -> b > 2)
     in
     { theme = model.theme
+
+    --
     , pk = pk
-    , tournament = Cache.get pk model.tournaments
+    , tournament = tournament
+    , team = team
+    , contracts = contracts
+    , manage = manage
+
+    --
     , scouts = scouts
     , soldiers = soldiers
     , demomen = demomen
     , medics = medics
-    , team = team
-    , contracts = contracts
-    , manage = manage
+
+    --
+    , isTournamentOver = isTournamentOver
+    , ranOutOfTransactions = ranOutOfTransactions
+    , isOverspending = isOverspending
+    , isInvalidComposition = isInvalidComposition
+    , isBreakingOverlapRule = isBreakingOverlapRule
+    , canSend =
+        not
+            (isTournamentOver
+                || ranOutOfTransactions
+                || isOverspending
+                || isInvalidComposition
+                || isBreakingOverlapRule
+            )
     }
 
 
@@ -675,7 +778,24 @@ managePage data =
                     text ""
                 ]
     in
-    [ input [ onInput (Msg.TeamNameChanged data.pk), value data.manage.name ] []
+    [ if data.isTournamentOver then
+        text "Tournament is over, you can't change your roster anymore"
+      else
+        text ""
+    , if data.ranOutOfTransactions then
+        text "You are exceeding the amount of transactions that are available to you"
+      else
+        text ""
+    , if data.isOverspending then
+        text "ran out of money"
+      else
+        text ""
+    , if data.isInvalidComposition then
+        text "not running 2 scouts 2 soldiers 1 demo 1 med"
+      else
+        text ""
+    , button [ onClick (Msg.TeamSubmitted data.pk) ] [ text "SEND LOL" ]
+    , input [ onInput (Msg.TeamNameChanged data.pk), value data.manage.name ] []
     , ul [] (List.map selectablePlayer data.scouts)
     , ul [] (List.map selectablePlayer data.soldiers)
     , ul [] (List.map selectablePlayer data.demomen)

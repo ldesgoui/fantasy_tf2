@@ -27,3 +27,12 @@ divBy b a =
 
 addTo b a =
     a + b
+
+
+isAfter now time =
+    not <| isBefore now time
+
+
+isBefore now time =
+    Time.posixToMillis time
+        < Time.posixToMillis now
