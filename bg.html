@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <style>
+body {
+    margin: 0;
+    padding: 0;
+    animation: bgColor 8s linear infinite;
+}
+
+.spinner {
+    position: absolute;
+    top: 50vh;
+    left: 50vw;
+    border-radius: 50%;
+    height: 15vw;
+    width: 15vw;
+    border-width: 10vw;
+    border-style: solid;
+    clip-path: polygon(
+        010% 000%, 090% 000%,
+        050% 040%, 060% 050%,
+        100% 010%, 100% 090%,
+        060% 050%, 050% 060%,
+        090% 100%, 010% 100%,
+        050% 060%, 040% 050%,
+        000% 090%, 000% 010%,
+        040% 050%, 050% 040%);
+    animation:
+        spin 8s ease-in-out infinite,
+        color 8s linear infinite;
+}
+
+@keyframes spin {
+    000% { transform: translate(-50%, -50%) rotate(0deg); }
+    050% { transform: translate(-50%, -50%) rotate(360deg); }
+    100% { transform: translate(-50%, -50%) rotate(0deg); }
+}
+
+@keyframes bgColor {
+    000% { background-color: #462d26; }
+    040% { background-color: #462d26; }
+    050% { background-color: #34302d; }
+    090% { background-color: #34302d; }
+    100% { background-color: #462d26; }
+}
+
+@keyframes color {
+    000% { border-color: #bd3b3b #9d312f #913a1e #6a4535; }
+    040% { border-color: #bd3b3b #9d312f #913a1e #6a4535; }
+    050% { border-color: #5b7a8c #395c78 #768a88 #6b6a65; }
+    090% { border-color: #5b7a8c #395c78 #768a88 #6b6a65; }
+    100% { border-color: #bd3b3b #9d312f #913a1e #6a4535; }
+}
+        </style>
+    </head>
+    <body><div class="spinner"></div></body>
+</html>
